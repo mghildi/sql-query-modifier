@@ -1,18 +1,20 @@
-import { NextResponse } from 'next/server';
-import axios from 'axios';
+// app/api/modify-query/route.ts
+
+import { NextResponse } from 'next/server'
+import axios from 'axios'
 
 export async function POST(req: Request) {
-  const { originalQuery, prompt } = await req.json();
+  const { originalQuery, prompt } = await req.json()
 
-  const instruction = `You are an expert SQL query engineer. Modify the following query based on this instruction: "${prompt}". Return only the updated SQL query, no extra text.`;
+  const instruction = `Modify this SQL query based on: "${prompt}". Return only the updated query.`
 
   try {
-    const response = await axios.post(
+    const res = await axios.post(
       'https://api.deepinfra.com/v1/openai/chat/completions',
       {
         model: 'meta-llama/Meta-Llama-3-70B-Instruct',
         messages: [
-          { role: 'system', content: 'You rewrite SQL queries based on user prompts.' },
+          { role: 'system', content: 'You rewrite SQL queries.' },
           { role: 'user', content: `${instruction}\nOriginal Query:\n${originalQuery}` },
         ],
         temperature: 0.3,
@@ -23,16 +25,14 @@ export async function POST(req: Request) {
           'Content-Type': 'application/json',
         },
       }
-    );
+    )
 
-    const modifiedQuery = response?.data?.choices?.[0]?.message?.content?.trim();
-    if (!modifiedQuery) {
-      throw new Error('LLM returned an empty or malformed response');
-    }
+    const modifiedQuery = res.data.choices?.[0]?.message?.content?.trim()
+    if (!modifiedQuery) throw new Error('Empty LLM response')
 
-    return NextResponse.json({ modifiedQuery });
+    return NextResponse.json({ modifiedQuery })
   } catch (err: any) {
-    console.error('DeepInfra API Error:', err.response?.data || err.message);
-    return NextResponse.json({ error: 'Failed to modify query' }, { status: 500 });
+    console.error('DeepInfra API Error:', err.response?.data || err.message)
+    return NextResponse.json({ error: err.message }, { status: 500 })
   }
 }
