@@ -1,17 +1,28 @@
-# debug
+# Logs
 npm-debug.log*
 yarn-debug.log*
-yarn-error.log*
-.pnpm-debug.log*
+pnpm-debug.log*
 
-# env files (can opt-in for committing if needed)
+# Env files (opt-in)
 .env*
 
-# vercel
-.vercel
+# Next.js
+/.next/
+/out/
 
-# typescript
+# Build output
+/build
+
+# Dependencies
+/node_modules/
+
+# Vercel
+.vercel/
+
+# TypeScript
 *.tsbuildinfo
 next-env.d.ts
 
-"service-account.json" 
+# Service-account keys
+service-account.json
+google-credentials.json
