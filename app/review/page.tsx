@@ -61,7 +61,7 @@ export default function ReviewPage() {
     const diff = dmp.diff_main(orig, mod);
     dmp.diff_cleanupSemantic(diff);
     return diff
-      .map(([type, text]) =>
+      .map(([type, text]: [number, string]) => =>
         type === DiffMatchPatch.DIFF_INSERT
           ? `<b>${text}</b>`
           : type === DiffMatchPatch.DIFF_DELETE
