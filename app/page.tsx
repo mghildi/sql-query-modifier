@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useRef } from 'react';
+import Link from 'next/link';
 import DiffMatchPatch from 'diff-match-patch';
 import { format } from 'sql-formatter';
 
@@ -156,7 +157,14 @@ export default function Home() {
 
   return (
     <div className="p-6 max-w-3xl mx-auto">
-      <h1 className="text-xl font-bold mb-4">SQL Query Modifier</h1>
+      <h1 className="text-xl font-bold mb-4 flex items-center justify-between">
+        SQL Query Modifier
+        <Link href="/review">
+          <button className="bg-indigo-600 text-white px-3 py-1 rounded text-sm">
+            Go to Review
+          </button>
+        </Link>
+      </h1>
       {/* User selector */}
       <div className="mb-4">
         <label className="font-semibold">Select User:</label>
