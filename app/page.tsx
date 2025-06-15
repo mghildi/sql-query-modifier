@@ -17,7 +17,7 @@ interface Submission {
 
 // Fetch submissions from the Sheets API using an absolute URL
 async function getSubmissions(): Promise<Submission[]> {
-  // In Next.js 15+, headers() returns a Promise<ReadonlyHeaders>
+  // headers() returns a Promise<ReadonlyHeaders>, so await it first
   const headersList = await headers()
   const host = headersList.get('host')!
   const protocol = process.env.NODE_ENV === 'development' ? 'http' : 'https'
