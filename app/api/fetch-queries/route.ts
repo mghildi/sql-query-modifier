@@ -1,10 +1,10 @@
 // app/api/fetch-queries/route.ts
 import { NextResponse } from 'next/server'
 import { google } from 'googleapis'
+import type { OAuth2Client } from 'google-auth-library'
 
 const spreadsheetId = process.env.SHEET_ID!
 
-// Build a single GoogleAuth instance with a real newline in the private key
 const auth = new google.auth.GoogleAuth({
   credentials: {
     client_email: process.env.GOOGLE_CLIENT_EMAIL,
@@ -14,19 +14,15 @@ const auth = new google.auth.GoogleAuth({
 })
 
 export async function GET() {
-  // Pass the `auth` object directly; googleapis will call getClient() internally
-  const sheets = google.sheets({ version: 'v4', auth })
+  // cast to OAuth2Client so google.sheets() accepts it
+  const client = (await auth.getClient()) as OAuth2Client
+  const sheets = google.sheets({ version: 'v4', auth: client })
 
   const resp = await sheets.spreadsheets.values.get({
     spreadsheetId,
     range: 'Submissions!A:J',
   })
 
-  const rows = resp.data.values ?? []
-  const approved = rows
-    .slice(1)
-    .filter(r => r[4] === 'Approved')
-    .map(r => ({ originalQuery: r[1] }))
-
-  return NextResponse.json(approved)
+  // ...process resp.data.values as before...
+  return NextResponse.json(/* ... */)
 }
