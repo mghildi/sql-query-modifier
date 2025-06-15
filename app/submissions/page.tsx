@@ -2,7 +2,7 @@ import React from 'react'
 import { headers } from 'next/headers'
 
 // Define the shape of a submission row
-interface Submission {
+type Submission = {
   rowIndex: number
   OriginalQuery: string
   Prompt: string
@@ -17,7 +17,9 @@ interface Submission {
 
 // Fetch submissions from the Sheets API using an absolute URL
 async function getSubmissions(): Promise<Submission[]> {
-  const host = headers().get('host')!
+  // Next.js 15+: headers() returns Promise<ReadonlyHeaders>
+  const headersList = await headers()
+  const host = headersList.get('host')!
   const protocol = process.env.NODE_ENV === 'development' ? 'http' : 'https'
   const url = `${protocol}://${host}/api/fetch-submissions`
 
@@ -50,7 +52,7 @@ export default async function SubmissionsPage() {
             </tr>
           </thead>
           <tbody>
-            {submissions.map(s => (
+            {submissions.map((s) => (
               <tr key={s.rowIndex} className="border-t first:border-t-0 last:border-b">
                 <td className="px-3 py-2 align-top">{s.rowIndex}</td>
                 <td className="px-3 py-2 align-top">{s.OriginalQuery}</td>
@@ -64,7 +66,7 @@ export default async function SubmissionsPage() {
                 <td className="px-3 py-2 align-top">{new Date(s.Timestamp).toLocaleString()}</td>
                 <td className="px-3 py-2 align-top">
                   <select defaultValue={s.BankName} className="border px-2 py-1 rounded">
-                    {uniqueBanks.map(bank => (
+                    {uniqueBanks.map((bank) => (
                       <option key={bank} value={bank}>{bank}</option>
                     ))}
                   </select>
