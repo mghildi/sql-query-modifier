@@ -43,14 +43,15 @@ export default function HomePage() {
   // Fetch approved queries on mount
   // ——————————————————————————————————————————————
   useEffect(() => {
-    fetch('/api/fetch-queries')
-      .then((r) => r.json())
-      .then((data) => {
-        if (Array.isArray(data)) setQueries(data)
-      })
-      .catch((err) => console.error('Error loading approved queries', err))
-  }, [])
+  fetch('/api/fetch-queries')
+    .then(r => r.json())
+    .then((data: { originalQuery: string }[]) => {
+      setQueries(data)
+    })
+    .catch(console.error)
+}, [])
 
+  
   // Helpers
   const getBaseQuery = () =>
     customQuery.trim() !== '' ? customQuery : selectedQuery
