@@ -17,15 +17,15 @@ interface Submission {
 
 // Fetch submissions from the Sheets API using an absolute URL
 async function getSubmissions(): Promise<Submission[]> {
-  // headers() returns a Promise<ReadonlyHeaders>, so await it first
-  const headersList = await headers()
-  const host = headersList.get('host')!
-  const protocol = process.env.NODE_ENV === 'development' ? 'http' : 'https'
-  const url = `${protocol}://${host}/api/fetch-submissions`
+  // headers() returns a Promise, so await it first
+  const headersList = await headers();
+  const host = headersList.get('host')!;
+  const protocol = process.env.NODE_ENV === 'development' ? 'http' : 'https';
+  const url = `${protocol}://${host}/api/fetch-submissions`;
 
-  const res = await fetch(url, { cache: 'no-store' })
-  if (!res.ok) throw new Error('Failed to load submissions')
-  return res.json()
+  const res = await fetch(url, { cache: 'no-store' });
+  if (!res.ok) throw new Error('Failed to load submissions');
+  return res.json();
 }
 
 export default async function SubmissionsPage() {
