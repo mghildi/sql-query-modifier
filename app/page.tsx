@@ -17,9 +17,16 @@ interface Submission {
 
 // Fetch submissions from the Sheets API using an absolute URL
 async function getSubmissions(): Promise<Submission[]> {
-  const host = headers().get('host')!
-  const protocol = process.env.NODE_ENV === 'development' ? 'http' : 'https'
-  const url = `${protocol}://${host}/api/fetch-submissions`
+  // In Next.js 15+, headers() returns a Promise, so we must await it
+  const headersList = await headers();
+  const host = headersList.get('host')!;
+  const protocol = process.env.NODE_ENV === 'development' ? 'http' : 'https';
+  const url = `${protocol}://${host}/api/fetch-submissions`;
+
+  const res = await fetch(url, { cache: 'no-store' });
+  if (!res.ok) throw new Error('Failed to load submissions');
+  return res.json();
+}://${host}/api/fetch-submissions`
 
   const res = await fetch(url, { cache: 'no-store' })
   if (!res.ok) throw new Error('Failed to load submissions')
