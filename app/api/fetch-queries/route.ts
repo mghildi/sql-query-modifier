@@ -4,7 +4,7 @@ import { google } from 'googleapis'
 
 const spreadsheetId = process.env.SHEET_ID!
 
-// Use GOOGLE_PRIVATE_KEY with actual newlines, not literal “\n” sequences
+// Use GOOGLE_PRIVATE_KEY with literal newlines
 const auth = new google.auth.GoogleAuth({
   credentials: {
     client_email: process.env.GOOGLE_CLIENT_EMAIL,
@@ -14,29 +14,22 @@ const auth = new google.auth.GoogleAuth({
 })
 
 export async function GET() {
-  // Pass the auth instance directly—googleapis handles getClient() internally
+  // Pass the auth instance directly
   const sheets = google.sheets({ version: 'v4', auth })
 
+  // Read the “Submissions” sheet
   const resp = await sheets.spreadsheets.values.get({
     spreadsheetId,
-    range: 'Submissions!A:J', // adjust if your sheet layout differs
+    range: 'Submissions!A:J',
   })
 
   const rows = resp.data.values ?? []
 
-  // Map each row into your Submission shape
-  const submissions = rows.slice(1).map((r) => ({
-    rowIndex:     Number(r[0]),
-    OriginalQuery:r[1] || '',
-    Prompt:       r[2] || '',
-    ModifiedQuery:r[3] || '',
-    Status:       r[4] || '',
-    SubmittedBy:  r[5] || '',
-    ApprovedBy:   r[6] || '',
-    Timestamp:    r[7] || '',
-    BankName:     r[8] || '',
-    Segment:      r[9] || '',
-  }))
+  // Map to your Submission shape
+  const approved = rows
+    .slice(1)
+    .filter((r) => r[4] === 'Approved')      // col 4 = Status
+    .map((r) => ({ originalQuery: r[1] }))   // col 1 = OriginalQuery
 
-  return NextResponse.json(submissions)
+  return NextResponse.json(approved)
 }
