@@ -1,0 +1,3 @@
+{
+  "/api/send-for-approval/route": "app/api/send-for-approval/route.js"
+}

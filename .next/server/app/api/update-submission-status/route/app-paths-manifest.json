@@ -1,0 +1,3 @@
+{
+  "/api/update-submission-status/route": "app/api/update-submission-status/route.js"
+}
