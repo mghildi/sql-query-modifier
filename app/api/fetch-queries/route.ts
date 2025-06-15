@@ -4,7 +4,7 @@ import { google } from 'googleapis'
 
 const spreadsheetId = process.env.SHEET_ID!
 
-// Use GOOGLE_PRIVATE_KEY with real newlines
+// Build a single GoogleAuth instance with a real newline in the private key
 const auth = new google.auth.GoogleAuth({
   credentials: {
     client_email: process.env.GOOGLE_CLIENT_EMAIL,
@@ -14,7 +14,7 @@ const auth = new google.auth.GoogleAuth({
 })
 
 export async function GET() {
-  // Pass the auth instance directly (no getClient())
+  // Pass the `auth` object directly; googleapis will call getClient() internally
   const sheets = google.sheets({ version: 'v4', auth })
 
   const resp = await sheets.spreadsheets.values.get({
@@ -23,12 +23,10 @@ export async function GET() {
   })
 
   const rows = resp.data.values ?? []
-
-  // Only return approved queries (col 4 == 'Approved')
   const approved = rows
     .slice(1)
-    .filter((r) => r[4] === 'Approved')
-    .map((r) => ({ originalQuery: r[1] }))
+    .filter(r => r[4] === 'Approved')
+    .map(r => ({ originalQuery: r[1] }))
 
   return NextResponse.json(approved)
 }
