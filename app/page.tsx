@@ -1,95 +1,68 @@
 // app/page.tsx
-import React from 'react'
+'use client'
+
+import React, { useState, useEffect, useRef } from 'react'
 import Link from 'next/link'
-import { headers } from 'next/headers'
+import DiffMatchPatch from 'diff-match-patch'
+import { format } from 'sql-formatter'
 
-// shape of a submission row
-interface Submission {
-  rowIndex: number
-  OriginalQuery: string
-  Prompt: string
-  ModifiedQuery: string
-  Status: string
-  SubmittedBy: string
-  ApprovedBy: string
-  Timestamp: string
-  BankName: string
-  Segment: string
-}
+// (You’ll need to re-import any hooks + state you already wrote for
+//  bankList/segmentList/approved queries/etc. This skeleton just shows
+//  the shell + View Submissions button.)
 
-// fetch all submissions
-async function getSubmissions(): Promise<Submission[]> {
-  const hdrs = await headers()
-  const host = hdrs.get('host')!
-  const protocol = process.env.NODE_ENV === 'development' ? 'http' : 'https'
-  const res = await fetch(`${protocol}://${host}/api/fetch-submissions`, { cache: 'no-store' })
-  if (!res.ok) throw new Error('Failed to load submissions')
-  return res.json()
-}
-
-export default async function Home() {
-  const submissions = await getSubmissions()
-
-  // gather unique bank names for the dropdown
-  const uniqueBanks = Array.from(new Set(submissions.map((s) => s.BankName)))
+export default function HomePage() {
+  // ───────────────────────────────────────────────────────────────
+  // YOUR EXISTING SQL‐BUILDER STATE & LOGIC GOES HERE
+  //
+  // const [bankList]      = useState<string[]>([])
+  // const [selectedBank]  = useState<string>('')
+  // const [segmentList]   = useState<string[]>([])
+  // const [selectedQuery] = useState<string>('')
+  // const [customQuery]   = useState<string>('')
+  // const [prompt, setPrompt] = useState('')
+  // const [modifiedQuery, setModifiedQuery] = useState('')
+  // const [editableQuery, setEditableQuery] = useState('')
+  // const [loading, setLoading]         = useState(false)
+  // const [formatOnly, setFormatOnly]   = useState(false)
+  // const editRef = useRef<HTMLTextAreaElement>(null)
+  //
+  // useEffect(() => { fetch banks & segments… }, [])
+  // useEffect(() => { fetch approved queries when bank+segment change }, [selectedBank, selectedSegment])
+  // function handleGenerate() { … }
+  // function handleFinalSubmit() { … }
+  // function handleSendForApproval() { … }
+  // ───────────────────────────────────────────────────────────────
 
   return (
-    <div className="p-6 max-w-5xl mx-auto">
+    <div className="p-6 max-w-3xl mx-auto">
       <div className="flex justify-between items-center mb-6">
-        <h1 className="text-2xl font-semibold">Query Submissions</h1>
-        <Link href="/review">
+        <h1 className="text-2xl font-semibold">SQL Query Modifier</h1>
+        <Link href="/submissions">
           <button className="bg-blue-600 text-white px-3 py-1 rounded">
-            Go to Review
+            View Submissions
           </button>
         </Link>
       </div>
 
-      <div className="overflow-x-auto">
-        <table className="min-w-full border-collapse">
-          <thead>
-            <tr className="bg-gray-100">
-              <th className="px-3 py-2 text-left text-sm font-medium">#</th>
-              <th className="px-3 py-2 text-left text-sm font-medium">Original</th>
-              <th className="px-3 py-2 text-left text-sm font-medium">Prompt</th>
-              <th className="px-3 py-2 text-left text-sm font-medium">Modified</th>
-              <th className="px-3 py-2 text-left text-sm font-medium">Status</th>
-              <th className="px-3 py-2 text-left text-sm font-medium">By</th>
-              <th className="px-3 py-2 text-left text-sm font-medium">Approved By</th>
-              <th className="px-3 py-2 text-left text-sm font-medium">When</th>
-              <th className="px-3 py-2 text-left text-sm font-medium">Bank</th>
-              <th className="px-3 py-2 text-left text-sm font-medium">Segment</th>
-            </tr>
-          </thead>
-          <tbody>
-            {submissions.map((s) => (
-              <tr key={s.rowIndex} className="border-t first:border-t-0 last:border-b">
-                <td className="px-3 py-2 align-top">{s.rowIndex}</td>
-                <td className="px-3 py-2 align-top">{s.OriginalQuery}</td>
-                <td className="px-3 py-2 align-top">{s.Prompt || '-'}</td>
-                <td className="px-3 py-2 align-top">
-                  <pre className="whitespace-pre-wrap m-0">{s.ModifiedQuery}</pre>
-                </td>
-                <td className="px-3 py-2 align-top">{s.Status}</td>
-                <td className="px-3 py-2 align-top">{s.SubmittedBy}</td>
-                <td className="px-3 py-2 align-top">{s.ApprovedBy || '-'}</td>
-                <td className="px-3 py-2 align-top">
-                  {new Date(s.Timestamp).toLocaleString()}
-                </td>
-                <td className="px-3 py-2 align-top">
-                  <select defaultValue={s.BankName} className="border px-2 py-1 rounded">
-                    {uniqueBanks.map((bank) => (
-                      <option key={bank} value={bank}>
-                        {bank}
-                      </option>
-                    ))}
-                  </select>
-                </td>
-                <td className="px-3 py-2 align-top">{s.Segment}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+      {/* ───────────────────────────────────────────────────────────── */}
+      {/* HERE: your builder form goes in place of the comment below */}
+      {/* ───────────────────────────────────────────────────────────── */}
+      {/* 
+        <div> Select user… </div>
+        <div> Bank dropdown… </div>
+        <div> Segment dropdown… </div>
+        <div> Approved queries dropdown… </div>
+        <div> Or paste custom SQL… </div>
+        <div> Prompt textarea… </div>
+        <div> Format-only checkbox… </div>
+        <button onClick={handleGenerate}>Generate Modified Query</button>
+        {modifiedQuery && (
+          <textarea ref={editRef} value={editableQuery} onChange={…} />
+          <button onClick={handleFinalSubmit}>Show Diff</button>
+          <button onClick={handleSendForApproval}>Send for Approval</button>
+        )}
+        {finalDiff && <div dangerouslySetInnerHTML={{ __html: finalDiff }} />}
+      */}
     </div>
   )
 }
