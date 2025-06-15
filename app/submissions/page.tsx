@@ -146,13 +146,16 @@ export default function Home() {
     dmp.diff_cleanupSemantic(diff);
     setFinalDiff(
       diff
-        .map(([type, text]) =>
-          type === DiffMatchPatch.DIFF_INSERT ? `<b>${text}</b>` :
-          type === DiffMatchPatch.DIFF_DELETE ? `<del>${text}</del>` : text
+        .map(([type, text]: [number, string]) =>
+          type === DiffMatchPatch.DIFF_INSERT
+            ? `<b>${text}</b>`
+            : type === DiffMatchPatch.DIFF_DELETE
+            ? `<del>${text}</del>`
+            : text
         )
         .join(''),
-    );
-  };
+      );
+  
 
   return (
     <div className="p-6 max-w-3xl mx-auto">
