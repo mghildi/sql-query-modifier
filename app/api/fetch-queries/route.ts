@@ -11,8 +11,9 @@ const auth = new google.auth.GoogleAuth({
 })
 
 export async function GET() {
-  const client = await auth.getClient()
-  const sheets = google.sheets({ version: 'v4', auth: client })
+  
+  const sheets = google.sheets({ version: 'v4', auth })
+
   const resp = await sheets.spreadsheets.values.get({
     spreadsheetId,
     range: 'Submissions!A:J', // adjust if your sheet layout differs
