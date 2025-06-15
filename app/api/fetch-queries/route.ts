@@ -1,28 +1,24 @@
 import { NextResponse } from 'next/server'
-import { google } from 'googleapis'
+import { google }    from 'googleapis'
 
 const spreadsheetId = process.env.SHEET_ID!
+
+// Decode & parse the whole JSON creds:
+const keyJson = JSON.parse(
+  Buffer.from(process.env.GOOGLE_SERVICE_KEY_JSON_B64!, 'base64').toString()
+)
+
 const auth = new google.auth.GoogleAuth({
-  credentials: {
-    client_email: process.env.GOOGLE_CLIENT_EMAIL,
-    private_key: process.env.GOOGLE_PRIVATE_KEY?.replace(/\\n/g, '\n'),
-  },
+  credentials: keyJson,
   scopes: ['https://www.googleapis.com/auth/spreadsheets.readonly'],
 })
 
 export async function GET() {
-  
-  const sheets = google.sheets({ version: 'v4', auth })
-
-  const resp = await sheets.spreadsheets.values.get({
+  const client = await auth.getClient()
+  const sheets = google.sheets({ version: 'v4', auth: client })
+  const resp   = await sheets.spreadsheets.values.get({
     spreadsheetId,
-    range: 'Submissions!A:J', // adjust if your sheet layout differs
+    range: 'Submissions!A:J',
   })
-  const rows = resp.data.values?.slice(1) || []
-  // assuming column 5 (zero-based) is “Status” and column 1 is the originalQuery:
-  const approved = rows
-    .filter((r) => r[5] === 'Approved')
-    .map((r) => ({ originalQuery: r[1] }))
-
-  return NextResponse.json(approved)
+  /* … */
 }
