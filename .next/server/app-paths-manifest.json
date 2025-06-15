@@ -1,5 +1,0 @@
-{
-  "/api/fetch-bank-segment/route": "app/api/fetch-bank-segment/route.js",
-  "/api/fetch-submissions/route": "app/api/fetch-submissions/route.js",
-  "/review/page": "app/review/page.js"
-}
