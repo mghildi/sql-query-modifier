@@ -146,14 +146,17 @@ export default function Home() {
     const diff = dmp.diff_main(orig.replace(/\s+/g, ' ').trim(), editableQuery.replace(/\s+/g, ' ').trim());
     dmp.diff_cleanupSemantic(diff);
     setFinalDiff(
-      diff
-        .map(([type, text]) =>
-          type === DiffMatchPatch.DIFF_INSERT ? `<b>${text}</b>` :
-          type === DiffMatchPatch.DIFF_DELETE ? `<del>${text}</del>` : text
-        )
-        .join(''),
-    );
-  };
+  diff
+    .map((pair: [number, string]): string => {
+      const [diffType, text] = pair;
+      if (diffType === DiffMatchPatch.DIFF_INSERT) return `<b>${text}</b>`;
+      if (diffType === DiffMatchPatch.DIFF_DELETE) return `<del>${text}</del>`;
+      return text;
+    })
+    .join('')
+);
+
+
 
   return (
     <div className="p-6 max-w-3xl mx-auto">
