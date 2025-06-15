@@ -4,7 +4,7 @@ import { google } from 'googleapis'
 
 const spreadsheetId = process.env.SHEET_ID!
 
-// Use GOOGLE_PRIVATE_KEY with literal newlines
+// Use GOOGLE_PRIVATE_KEY with real newlines
 const auth = new google.auth.GoogleAuth({
   credentials: {
     client_email: process.env.GOOGLE_CLIENT_EMAIL,
@@ -14,10 +14,9 @@ const auth = new google.auth.GoogleAuth({
 })
 
 export async function GET() {
-  // Pass the auth instance directly
+  // Pass the auth instance directly (no getClient())
   const sheets = google.sheets({ version: 'v4', auth })
 
-  // Read the “Submissions” sheet
   const resp = await sheets.spreadsheets.values.get({
     spreadsheetId,
     range: 'Submissions!A:J',
@@ -25,11 +24,11 @@ export async function GET() {
 
   const rows = resp.data.values ?? []
 
-  // Map to your Submission shape
+  // Only return approved queries (col 4 == 'Approved')
   const approved = rows
     .slice(1)
-    .filter((r) => r[4] === 'Approved')      // col 4 = Status
-    .map((r) => ({ originalQuery: r[1] }))   // col 1 = OriginalQuery
+    .filter((r) => r[4] === 'Approved')
+    .map((r) => ({ originalQuery: r[1] }))
 
   return NextResponse.json(approved)
 }
