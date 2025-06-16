@@ -1,38 +1,35 @@
 // app/api/fetch-queries/route.ts
-import type { OAuth2Client }    from 'google-auth-library'
-import { google }               from 'googleapis'
-import { NextResponse }         from 'next/server'
+import { NextResponse } from 'next/server'
+import { google }       from 'googleapis'
 
 const spreadsheetId = process.env.SHEET_ID!
 
-// Use GOOGLE_PRIVATE_KEY with real newlines
+// Create a GoogleAuth instance using your service-account credentials
 const auth = new google.auth.GoogleAuth({
   credentials: {
     client_email: process.env.GOOGLE_CLIENT_EMAIL,
+    // Replace literal “\n” sequences with real newlines
     private_key: process.env.GOOGLE_PRIVATE_KEY?.replace(/\\n/g, '\n'),
   },
   scopes: ['https://www.googleapis.com/auth/spreadsheets.readonly'],
 })
 
 export async function GET() {
-  // 1. Get an OAuth2Client instance
-  const client = (await auth.getClient()) as OAuth2Client
+  // Pass the GoogleAuth instance directly
+  const sheets = google.sheets({ version: 'v4', auth })
 
-  // 2. Pass it to google.sheets() so TS matches the overload
-  const sheets = google.sheets({ version: 'v4', auth: client })
-
-  // 3. Read your "Submissions" sheet
+  // Fetch the “Submissions” sheet
   const resp = await sheets.spreadsheets.values.get({
     spreadsheetId,
     range: 'Submissions!A:J',
   })
 
-  // 4. Return only the approved queries
   const rows = resp.data.values ?? []
+  // Filter only approved & map to { originalQuery }
   const approved = rows
     .slice(1)
-    .filter((r) => r[4] === 'Approved')     // assuming col 4 is Status
-    .map((r) => ({ originalQuery: r[1] || '' })) // col 1 is the query
+    .filter((r) => r[4] === 'Approved')      // column 4 = Status
+    .map((r) => ({ originalQuery: r[1] || '' })) // column 1 = query
 
   return NextResponse.json(approved)
 }
