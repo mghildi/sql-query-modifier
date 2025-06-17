@@ -113,11 +113,19 @@ export default function SubmissionsForm() {
     const dmp = new DiffMatchPatch()
     const diff = dmp.diff_main(orig, newQ)
     dmp.diff_cleanupSemantic(diff)
-    setFinalDiff(diff.map(([t, txt]) =>
-      t === DiffMatchPatch.DIFF_INSERT ? `<b>${txt}</b>` :
-      t === DiffMatchPatch.DIFF_DELETE ? `<del>${txt}</del>` :
-      txt
-    ).join(''))
+   
+    setFinalDiff(
+      diff
+        .map(([t, txt]: [number, string]) =>
+          t === DiffMatchPatch.DIFF_INSERT
+            ? `<b>${txt}</b>`
+            : t === DiffMatchPatch.DIFF_DELETE
+            ? `<del>${txt}</del>`
+            : txt
+        )
+        .join('')
+    )
+
   }
 
   // Send for approval
