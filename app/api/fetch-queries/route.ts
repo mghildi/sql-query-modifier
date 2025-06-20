@@ -33,8 +33,16 @@ export async function GET(req: Request) {
 
   const rows = resp.data.values ?? [];
   const matches = rows
-    .filter(([b, s]) => b === bank && s === segment)
-    .map(([, , sql]) => ({ originalQuery: sql || '' }));
+  .filter(row => row.length >= 3)
+  .filter(([b, s]) =>
+    b?.trim().toLowerCase() === bank.toLowerCase() &&
+    s?.trim().toLowerCase() === segment.toLowerCase()
+  )
+  .map(([, , sql]) => ({
+    originalQuery: (sql || '').replace(/^"+|"+$/g, '')
+  }));
+
+
 
   return NextResponse.json(matches);
 }
