@@ -1,42 +1,40 @@
 // app/api/fetch-queries/route.ts
 import { NextResponse } from 'next/server';
 import { google } from 'googleapis';
+import { Buffer } from 'buffer';
 
-const spreadsheetId = process.env.SHEET_ID!;
+function loadServiceAccount() {
+  const b64 = process.env.GOOGLE_SERVICE_KEY_JSON_B64!;
+  const json = Buffer.from(b64, 'base64').toString('utf8');
+  return JSON.parse(json) as { client_email: string; private_key: string; [k: string]: any };
+}
 
-// Use the GoogleAuth instance directly
-const auth = new google.auth.GoogleAuth({
-  credentials: {
-    client_email: process.env.GOOGLE_CLIENT_EMAIL,
-    // turn literal “\n” sequences into real newlines
-    private_key: process.env.GOOGLE_PRIVATE_KEY?.replace(/\\n/g, '\n'),
-  },
-  scopes: ['https://www.googleapis.com/auth/spreadsheets.readonly'],
-});
+export async function GET(req: Request) {
+  const { searchParams } = new URL(req.url);
+  const bank    = searchParams.get('bank')!;
+  const segment = searchParams.get('segment')!;
 
-export async function GET() {
-  // Pass auth (GoogleAuth) instead of a raw client
+  const svc = loadServiceAccount();
+  svc.private_key = svc.private_key.replace(/\\n/g, '\n');
+
+  const auth = new google.auth.GoogleAuth({
+    credentials: svc,
+    scopes: ['https://www.googleapis.com/auth/spreadsheets.readonly'],
+  });
   const sheets = google.sheets({ version: 'v4', auth });
 
+  // *** Read Sheet1 – adjust columns to where “approved queries” live ***
+  // e.g. maybe Column C holds the SQL, Column A=bank, B=segment, C=query
+  const spreadsheetId = process.env.SHEET_ID!;
   const resp = await sheets.spreadsheets.values.get({
     spreadsheetId,
-    range: 'Submissions!A:J',
+    range: 'Sheet1!A2:C',
   });
 
   const rows = resp.data.values ?? [];
+  const matches = rows
+    .filter(([b, s]) => b === bank && s === segment)
+    .map(([, , sql]) => ({ originalQuery: sql || '' }));
 
-  const submissions = rows.slice(1).map((r) => ({
-    rowIndex:   Number(r[0] || 0),
-    OriginalQuery:  r[1] || '',
-    Prompt:         r[2] || '',
-    ModifiedQuery:  r[3] || '',
-    Status:         r[4] || '',
-    SubmittedBy:    r[5] || '',
-    ApprovedBy:     r[6] || '',
-    Timestamp:      r[7] || '',
-    BankName:       r[8] || '',
-    Segment:        r[9] || '',
-  }));
-
-  return NextResponse.json(submissions);
+  return NextResponse.json(matches);
 }

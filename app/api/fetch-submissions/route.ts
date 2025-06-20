@@ -1,63 +1,42 @@
 // app/api/fetch-submissions/route.ts
-import { google } from 'googleapis'
-import { NextResponse } from 'next/server'
-
-// Optional: sanity-check on startup
-const B64 = process.env.GOOGLE_SERVICE_KEY_JSON_B64
-console.log(
-  '🔑 GOOGLE_SERVICE_KEY_JSON_B64 length:',
-  B64?.length,
-  'first 10 chars:',
-  B64?.slice(0, 10)
-)
+import { NextResponse } from 'next/server';
+import { google }        from 'googleapis';
+import { Buffer }        from 'buffer';
 
 function loadServiceAccount() {
-  if (!B64) {
-    throw new Error('Missing env var: GOOGLE_SERVICE_KEY_JSON_B64')
-  }
-  // 1) Decode from base64 → UTF-8 JSON string
-  const raw = Buffer.from(B64, 'base64').toString('utf8')
-  // 2) Parse into an object
-  const svc = JSON.parse(raw) as {
-    private_key: string
-    client_email: string
-    [key: string]: any
-  }
-  // 3) No need to replace \\n now — they’re real newlines
-  return svc
+  const b64 = process.env.GOOGLE_SERVICE_KEY_JSON_B64!;
+  return JSON.parse(Buffer.from(b64, 'base64').toString('utf8'));
 }
 
 export async function GET() {
-  try {
-    const serviceAccount = loadServiceAccount()
+  const svc = loadServiceAccount();
+  svc.private_key = svc.private_key.replace(/\\n/g, '\n');
 
-    const auth = new google.auth.GoogleAuth({
-      credentials: serviceAccount,
-      scopes: ['https://www.googleapis.com/auth/spreadsheets'],
-    })
+  const auth = new google.auth.GoogleAuth({
+    credentials: svc,
+    scopes: ['https://www.googleapis.com/auth/spreadsheets.readonly'],
+  });
+  const sheets = google.sheets({ version: 'v4', auth });
+  const spreadsheetId = process.env.SHEET_ID!;
+  const resp = await sheets.spreadsheets.values.get({
+    spreadsheetId,
+    range: 'Submissions!A2:J',
+  });
+  const rows = resp.data.values ?? [];
 
-    const sheets = google.sheets({ version: 'v4', auth })
-    const spreadsheetId = '1GwTyj7g0pbqyvwBiWbUXHi_J1qboJ2rryXgCXtpnvLM'
-    const range = 'Submissions!A2:I'
-    const resp = await sheets.spreadsheets.values.get({ spreadsheetId, range })
-    const rows = resp.data.values || []
+  const submissions = rows.map((r, i) => ({
+    rowIndex:      i + 2,
+    OriginalQuery: r[0] || '',
+    Prompt:        r[1] || '',
+    ModifiedQuery: r[2] || '',
+    Status:        r[3] || '',
+    SubmittedBy:   r[4] || '',
+    ApprovedBy:    r[5] || '',
+    Timestamp:     r[6] || '',
+    BankName:      r[7] || '',
+    Segment:       r[8] || '',
+    // column-9 might be anything else…
+  }));
 
-    const submissions = rows.map((row, i) => ({
-      rowIndex:      i + 2,
-      OriginalQuery: row[0] || '',
-      Prompt:        row[1] || '',
-      ModifiedQuery: row[2] || '',
-      Status:        row[3] || '',
-      SubmittedBy:   row[4] || '',
-      ApprovedBy:    row[5] || '',
-      Timestamp:     row[6] || '',
-      BankName:      row[7] || '',
-      Segment:       row[8] || '',
-    }))
-
-    return NextResponse.json(submissions)
-  } catch (e: any) {
-    console.error('Error fetching submissions:', e)
-    return NextResponse.json({ error: e.message }, { status: 500 })
-  }
+  return NextResponse.json(submissions);
 }
