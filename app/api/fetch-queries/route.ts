@@ -39,8 +39,11 @@ export async function GET(req: Request) {
     s?.trim().toLowerCase() === segment.toLowerCase()
   )
   .map(([, , sql]) => ({
-    originalQuery: (sql || '').replace(/^"+|"+$/g, '')
+    originalQuery: (sql || '')
+      .replace(/^"+|"+$/g, '')
+      .replace(/""/g, '"')
   }));
+
 
 
 
