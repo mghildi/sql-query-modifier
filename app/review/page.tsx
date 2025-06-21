@@ -112,6 +112,12 @@ export default function ReviewPage() {
   return (
     <div className="p-6 mx-auto max-w-5xl">
       <h1 className="text-2xl font-bold mb-6">Review Submissions</h1>
+      <a
+        href="/"
+        className="inline-block mb-4 text-blue-600 underline hover:text-blue-800"
+      >
+        ← Go to Home
+      </a>
 
       {/* Reviewer */}
       <div className="mb-6">
