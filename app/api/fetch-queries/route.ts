@@ -22,7 +22,7 @@ export async function GET(req: Request) {
   });
   const sheets = google.sheets({ version: 'v4', auth });
 
-  const spreadsheetId = process.env.SHEET_ID!;
+  const spreadsheetId = '1GwTyj7g0pbqyvwBiWbUXHi_J1qboJ2rryXgCXtpnvLM';
   const resp = await sheets.spreadsheets.values.get({
     spreadsheetId,
     range: 'Sheet1!A2:C',
