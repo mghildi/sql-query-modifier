@@ -17,7 +17,7 @@ export async function GET() {
     scopes: ['https://www.googleapis.com/auth/spreadsheets.readonly'],
   });
   const sheets = google.sheets({ version: 'v4', auth });
-  const spreadsheetId = process.env.SHEET_ID!;
+  const spreadsheetId = '1GwTyj7g0pbqyvwBiWbUXHi_J1qboJ2rryXgCXtpnvLM';
   const resp = await sheets.spreadsheets.values.get({
     spreadsheetId,
     range: 'Submissions!A2:J',

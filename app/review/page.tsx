@@ -1,285 +1,211 @@
 'use client';
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useEffect, useState } from 'react';
 import DiffMatchPatch from 'diff-match-patch';
-import { format } from 'sql-formatter';
 
-type Query = { originalQuery: string };
-type BankSegment = {
-  bankNames: string[];
-  segmentMapping: { bank: string; segment: string }[];
+type Submission = {
+  rowIndex: number;
+  BankName: string;
+  Segment: string;
+  OriginalQuery: string;
+  Prompt: string;
+  ModifiedQuery: string;
+  Status: string;
+  SubmittedBy: string;
+  ApprovedBy: string;
+  Timestamp: string;
 };
 
-export default function SubmissionsPage() {
-  // ── Master data ──────────────────────────────────────
-  const [bankList, setBankList]               = useState<string[]>([]);
-  const [fullSegmentList, setFullSegmentList] = useState<BankSegment['segmentMapping']>([]);
+type SegmentMapping = { bank: string; segment: string };
 
-  // ── Selections ───────────────────────────────────────
-  const [selectedBank, setSelectedBank]       = useState('');
-  const [customBank, setCustomBank]           = useState('');
-  const [selectedSegment, setSelectedSegment] = useState('');
-  const [customSegment, setCustomSegment]     = useState('');
+export default function ReviewPage() {
+  const [submissions, setSubmissions] = useState<Submission[]>([]);
+  const [filtered, setFiltered] = useState<Submission[]>([]);
+  const [banks, setBanks] = useState<string[]>([]);
+  const [segments, setSegments] = useState<string[]>([]);
+  const [mapping, setMapping] = useState<SegmentMapping[]>([]);
 
-  // ── Fetched queries & chosen/pasted SQL ──────────────
-  const [queries, setQueries]                 = useState<Query[]>([]);
-  const [selectedQuery, setSelectedQuery]     = useState('');
-  const [customQuery, setCustomQuery]         = useState('');
+  const [bank, setBank] = useState('');
+  const [segment, setSegment] = useState('');
 
-  // ── Prompt & LLM state ────────────────────────────────
-  const [prompt, setPrompt]                   = useState('');
-  const [modifiedQuery, setModifiedQuery]     = useState('');
-  const [editableQuery, setEditableQuery]     = useState('');
-  const [finalDiff, setFinalDiff]             = useState('');
-  const [loading, setLoading]                 = useState(false);
-  const [formatOnly, setFormatOnly]           = useState(false);
-  const editBoxRef = useRef<HTMLTextAreaElement>(null);
+  const [reviewer, setReviewer] = useState('Mohit');
+  const [customReviewer, setCustomReviewer] = useState('');
 
-  // ── 1) Load bank/segment master ───────────────────────
+  // Fetch master bank/segment mapping
   useEffect(() => {
     fetch('/api/fetch-bank-segment')
-      .then(r => r.json())
-      .then((data: BankSegment) => {
-        setBankList(data.bankNames);
-        setFullSegmentList(data.segmentMapping);
-      })
-      .catch(console.error);
+      .then(res => res.json())
+      .then(data => {
+        setBanks(data.bankNames || []);
+        setMapping(data.segmentMapping || []);
+      });
   }, []);
 
-  // ── 2) Compute filtered segments ──────────────────────
-  const filteredSegmentList = selectedBank && selectedBank !== 'Others'
-    ? Array.from(new Set(
-        fullSegmentList
-          .filter(m => m.bank === selectedBank)
-          .map(m => m.segment)
-      ))
-    : [];
-
-  // ── 3) Fetch approved queries when bank+segment set ───
+  // Fetch all pending submissions
   useEffect(() => {
-    const bankToSend    = selectedBank === 'Others' ? customBank    : selectedBank;
-    const segmentToSend = selectedSegment === 'Others' ? customSegment : selectedSegment;
-    if (!bankToSend || !segmentToSend) return;
-
-    fetch(`/api/fetch-queries?bank=${encodeURIComponent(bankToSend)}&segment=${encodeURIComponent(segmentToSend)}`)
-      .then(r => r.json())
-      .then((qs: Query[]) => setQueries(Array.isArray(qs) ? qs : []))
-      .catch(err => {
-        console.error('Error fetching queries:', err);
-        setQueries([]);
+    fetch('/api/fetch-submissions')
+      .then(res => res.json())
+      .then((data: Submission[]) => {
+        const pending = data.filter(d => d.Status === 'Pending');
+        setSubmissions(pending);
       });
-  }, [selectedBank, selectedSegment, customBank, customSegment]);
+  }, []);
 
-  // ── Helpers ───────────────────────────────────────────
-  const getBaseQuery = () =>
-    customQuery.trim() !== '' ? customQuery : selectedQuery;
+  // Update segments when bank is selected
+  useEffect(() => {
+    if (!bank) return setSegments([]);
+    const segs = mapping.filter(m => m.bank === bank).map(m => m.segment);
+    setSegments(Array.from(new Set(segs)));
+    setSegment('');
+    setFiltered([]);
+  }, [bank, mapping]);
 
-  const autoResize = () => {
-    if (editBoxRef.current) {
-      editBoxRef.current.style.height = 'auto';
-      editBoxRef.current.style.height = editBoxRef.current.scrollHeight + 'px';
-    }
+  // Filter submissions for selected bank & segment
+  useEffect(() => {
+    if (!bank || !segment) return setFiltered([]);
+    setFiltered(
+      submissions.filter(s => s.BankName === bank && s.Segment === segment)
+    );
+  }, [bank, segment, submissions]);
+
+  const reviewerName =
+    reviewer === 'Others' ? customReviewer.trim() || 'Unknown' : reviewer;
+
+  const handleDecision = async (
+    item: Submission,
+    action: 'approve' | 'reject'
+  ) => {
+    const url =
+      action === 'approve' ? '/api/approve-submission' : '/api/reject-submission';
+    const body =
+      action === 'approve'
+        ? { rowIndex: item.rowIndex, approvedBy: reviewerName }
+        : { rowIndex: item.rowIndex, rejectedBy: reviewerName };
+
+    await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+
+    // Remove item from UI
+    setSubmissions(s => s.filter(r => r.rowIndex !== item.rowIndex));
+    setFiltered(f => f.filter(r => r.rowIndex !== item.rowIndex));
+
+    alert(`${action === 'approve' ? 'Approved' : 'Rejected'} by ${reviewerName}`);
   };
 
-  // ── Generate or format ─────────────────────────────────
-  const handleGenerate = async () => {
-    setLoading(true);
-    setFinalDiff('');
-    const original = getBaseQuery();
-
-    if (formatOnly) {
-      const f = format(original);
-      setModifiedQuery(f);
-      setEditableQuery(f);
-      setLoading(false);
-      return;
-    }
-
-    try {
-      const res = await fetch('/api/modify-query', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ originalQuery: original, prompt }),
-      });
-      const { modifiedQuery: mod } = await res.json();
-      const f = format(mod || '');
-      setModifiedQuery(f);
-      setEditableQuery(f);
-    } catch {
-      setModifiedQuery('Error generating modification');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // ── Diff highlighting ─────────────────────────────────
   const highlightDiff = (orig: string, mod: string) => {
+    if (!orig || !mod) return '<i>Missing query</i>';
     const dmp = new DiffMatchPatch();
     const diff = dmp.diff_main(orig, mod);
     dmp.diff_cleanupSemantic(diff);
     return diff
-      .map(([t, txt]: [number, string]) => {
-        if (t === DiffMatchPatch.DIFF_INSERT) return `<b>${txt}</b>`;
-        if (t === DiffMatchPatch.DIFF_DELETE) return `<del>${txt}</del>`;
-        return txt;
+      .map(([type, text]: [number, string]) => {
+        if (type === DiffMatchPatch.DIFF_INSERT) return `<b>${text}</b>`;
+        if (type === DiffMatchPatch.DIFF_DELETE) return `<del>${text}</del>`;
+        return text;
       })
       .join('');
   };
 
-  const handleFinalSubmit = () => {
-    setFinalDiff(highlightDiff(getBaseQuery(), editableQuery));
-  };
-
-  // ── Send for approval ─────────────────────────────────
-  const handleSendForApproval = async () => {
-    await fetch('/api/send-for-approval', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        originalQuery: getBaseQuery(),
-        prompt,
-        modifiedQuery: editableQuery,
-        bank: selectedBank,
-        segment: selectedSegment,
-      }),
-    });
-    alert('Sent for approval!');
-  };
-
-  // ── Render ────────────────────────────────────────────
   return (
-    <div className="p-6 max-w-3xl mx-auto">
-      <h1 className="text-xl font-bold mb-4">SQL Query Modifier</h1>
+    <div className="p-6 mx-auto max-w-5xl">
+      <h1 className="text-2xl font-bold mb-6">Review Submissions</h1>
 
-      {/* Bank selector */}
-      <div className="mb-4">
-        <label className="block font-semibold mb-1">Select Bank:</label>
+      {/* Reviewer */}
+      <div className="mb-6">
+        <label className="block font-semibold mb-2">Reviewer:</label>
         <select
-          value={selectedBank}
-          onChange={e => setSelectedBank(e.target.value)}
-          className="w-full p-2 border mb-2"
+          value={reviewer}
+          onChange={e => setReviewer(e.target.value)}
+          className="border p-2 rounded w-full"
         >
-          <option value="">-- Select Bank --</option>
-          {bankList.map(b => <option key={b}>{b}</option>)}
-          <option value="Others">Others</option>
-        </select>
-        {selectedBank === 'Others' && (
-          <input
-            className="w-full p-2 border"
-            placeholder="Custom bank"
-            value={customBank}
-            onChange={e => setCustomBank(e.target.value)}
-          />
-        )}
-      </div>
-
-      {/* Segment selector */}
-      <div className="mb-4">
-        <label className="block font-semibold mb-1">Select Segment:</label>
-        <select
-          value={selectedSegment}
-          onChange={e => setSelectedSegment(e.target.value)}
-          className="w-full p-2 border mb-2"
-        >
-          <option value="">-- Select Segment --</option>
-          {filteredSegmentList.map(s => <option key={s}>{s}</option>)}
-          <option value="Others">Others</option>
-        </select>
-        {selectedSegment === 'Others' && (
-          <input
-            className="w-full p-2 border"
-            placeholder="Custom segment"
-            value={customSegment}
-            onChange={e => setCustomSegment(e.target.value)}
-          />
-        )}
-      </div>
-
-      {/* Approved queries dropdown */}
-      <div className="mb-4">
-        <label className="font-semibold">Pick an approved query:</label>
-        <select
-          className="w-full p-2 border mb-2"
-          value={selectedQuery}
-          onChange={e => setSelectedQuery(e.target.value)}
-        >
-          <option value="">-- none --</option>
-          {queries.map((q, i) => (
-            <option key={i} value={q.originalQuery}>
-              {q.originalQuery}
-            </option>
+          {['Mohit', 'Bhaskar', 'Prerna', 'Others'].map(name => (
+            <option key={name}>{name}</option>
           ))}
         </select>
-
-        <label className="font-semibold">Or paste your own SQL:</label>
-        <textarea
-          className="w-full p-2 border h-24"
-          value={customQuery}
-          onChange={e => setCustomQuery(e.target.value)}
-        />
-      </div>
-
-      {/* Prompt */}
-      <div className="mb-4">
-        <label className="font-semibold">Instruction / Prompt:</label>
-        <textarea
-          className="w-full p-2 border h-20"
-          value={prompt}
-          onChange={e => setPrompt(e.target.value)}
-        />
-      </div>
-
-      {/* Format-only toggle */}
-      <label className="flex items-center mb-4">
-        <input
-          type="checkbox"
-          className="mr-2"
-          checked={formatOnly}
-          onChange={e => setFormatOnly(e.target.checked)}
-        />
-        Only format (no changes)
-      </label>
-
-      {/* Generate */}
-      <button
-        disabled={loading}
-        onClick={handleGenerate}
-        className="bg-green-600 text-white px-4 py-2 rounded mb-4"
-      >
-        {loading ? 'Generating…' : 'Generate Modified Query'}
-      </button>
-
-      {/* Editable result */}
-      {modifiedQuery && (
-        <div className="mb-6">
-          <h2 className="font-semibold">Edit Modified Query</h2>
-          <textarea
-            ref={editBoxRef}
-            className="w-full p-2 border resize-none overflow-hidden"
-            value={editableQuery}
-            onChange={e => { setEditableQuery(e.target.value); autoResize(); }}
-            onInput={autoResize}
+        {reviewer === 'Others' && (
+          <input
+            type="text"
+            placeholder="Your name"
+            value={customReviewer}
+            onChange={e => setCustomReviewer(e.target.value)}
+            className="mt-2 border p-2 rounded w-full"
           />
-          <div className="mt-2 flex gap-2">
-            <button onClick={handleFinalSubmit} className="bg-blue-600 text-white px-4 py-2 rounded">
-              Submit Final
+        )}
+      </div>
+
+      {/* Bank Selector */}
+      <div className="mb-4">
+        <p className="font-semibold mb-2">Select Bank:</p>
+        <div className="flex flex-wrap gap-2">
+          {banks.map(b => (
+            <button
+              key={b}
+              onClick={() => setBank(b)}
+              className={`px-4 py-2 rounded ${
+                bank === b ? 'bg-blue-600 text-white' : 'bg-gray-200'
+              }`}
+            >
+              {b}
             </button>
-            <button onClick={handleSendForApproval} className="bg-yellow-500 text-white px-4 py-2 rounded">
-              Send for Approval
-            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Segment Selector */}
+      {segments.length > 0 && (
+        <div className="mb-6">
+          <p className="font-semibold mb-2">Select Segment:</p>
+          <div className="flex flex-wrap gap-2">
+            {segments.map(s => (
+              <button
+                key={s}
+                onClick={() => setSegment(s)}
+                className={`px-4 py-2 rounded ${
+                  segment === s ? 'bg-green-600 text-white' : 'bg-gray-200'
+                }`}
+              >
+                {s}
+              </button>
+            ))}
           </div>
         </div>
       )}
 
-      {/* Diff view */}
-      {finalDiff && (
-        <div>
-          <h2 className="font-semibold">Final Diff</h2>
+      {/* Submissions List */}
+      {filtered.map(item => (
+        <div key={item.rowIndex} className="border rounded p-4 mb-4 bg-white">
+          <p><strong>Submitted By:</strong> {item.SubmittedBy}</p>
+          <p><strong>Prompt:</strong> {item.Prompt}</p>
+          <p className="mt-2"><strong>Changes:</strong></p>
           <div
-            className="bg-gray-100 p-4 rounded whitespace-pre-wrap"
-            dangerouslySetInnerHTML={{ __html: finalDiff }}
+            className="bg-gray-100 p-2 rounded whitespace-pre-wrap"
+            dangerouslySetInnerHTML={{
+              __html: highlightDiff(item.OriginalQuery, item.ModifiedQuery),
+            }}
           />
+          <div className="mt-4 flex gap-2">
+            <button
+              onClick={() => handleDecision(item, 'approve')}
+              className="bg-green-600 text-white px-4 py-2 rounded"
+            >
+              Approve
+            </button>
+            <button
+              onClick={() => handleDecision(item, 'reject')}
+              className="bg-red-600 text-white px-4 py-2 rounded"
+            >
+              Reject
+            </button>
+          </div>
         </div>
+      ))}
+
+      {/* Empty state */}
+      {bank && segment && filtered.length === 0 && (
+        <p>No pending submissions for <em>{bank}</em> / <em>{segment}</em>.</p>
       )}
     </div>
   );
