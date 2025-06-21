@@ -5,41 +5,48 @@ import DiffMatchPatch from 'diff-match-patch';
 import { format } from 'sql-formatter';
 
 type Query = { originalQuery: string };
-type BankSegment = { bankNames: string[]; segmentMapping: { bank: string; segment: string }[] };
+type BankSegment = {
+  bankNames: string[];
+  segmentMapping: { bank: string; segment: string }[];
+};
 
 export default function SubmissionsPage() {
-  // fetched master data
-  const [bankList, setBankList]                 = useState<string[]>([]);
-  const [fullSegmentList, setFullSegmentList]   = useState<{ bank: string; segment: string }[]>([]);
-  // selections & inputs
-  const [selectedBank, setSelectedBank]         = useState('');
-  const [customBank, setCustomBank]             = useState('');
-  const [selectedSegment, setSelectedSegment]   = useState('');
-  const [customSegment, setCustomSegment]       = useState('');
-  const [queries, setQueries]                   = useState<Query[]>([]);
-  const [selectedQuery, setSelectedQuery]       = useState('');
-  const [customQuery, setCustomQuery]           = useState('');
-  const [prompt, setPrompt]                     = useState('');
-  // modification workflow
-  const [modifiedQuery, setModifiedQuery]       = useState('');
-  const [editableQuery, setEditableQuery]       = useState('');
-  const [finalDiff, setFinalDiff]               = useState('');
-  const [loading, setLoading]                   = useState(false);
-  const [formatOnly, setFormatOnly]             = useState(false);
+  // ── Master data ──────────────────────────────────────
+  const [bankList, setBankList]               = useState<string[]>([]);
+  const [fullSegmentList, setFullSegmentList] = useState<BankSegment['segmentMapping']>([]);
+
+  // ── Selections ───────────────────────────────────────
+  const [selectedBank, setSelectedBank]       = useState('');
+  const [customBank, setCustomBank]           = useState('');
+  const [selectedSegment, setSelectedSegment] = useState('');
+  const [customSegment, setCustomSegment]     = useState('');
+
+  // ── Fetched queries & chosen/pasted SQL ──────────────
+  const [queries, setQueries]                 = useState<Query[]>([]);
+  const [selectedQuery, setSelectedQuery]     = useState('');
+  const [customQuery, setCustomQuery]         = useState('');
+
+  // ── Prompt & LLM state ────────────────────────────────
+  const [prompt, setPrompt]                   = useState('');
+  const [modifiedQuery, setModifiedQuery]     = useState('');
+  const [editableQuery, setEditableQuery]     = useState('');
+  const [finalDiff, setFinalDiff]             = useState('');
+  const [loading, setLoading]                 = useState(false);
+  const [formatOnly, setFormatOnly]           = useState(false);
   const editBoxRef = useRef<HTMLTextAreaElement>(null);
 
-  // 1️⃣ load bank/segment master data
+  // ── 1) Load bank/segment master ───────────────────────
   useEffect(() => {
     fetch('/api/fetch-bank-segment')
       .then(r => r.json())
-      .then((d: BankSegment) => {
-        setBankList(d.bankNames || []);
-        setFullSegmentList(d.segmentMapping || []);
+      .then((data: BankSegment) => {
+        setBankList(data.bankNames);
+        setFullSegmentList(data.segmentMapping);
       })
       .catch(console.error);
   }, []);
 
-  // 2️⃣ when bank changes, recompute available segments
+  // ── 2) Compute filtered segments ──────────────────────
   const filteredSegmentList = selectedBank && selectedBank !== 'Others'
     ? Array.from(new Set(
         fullSegmentList
@@ -48,22 +55,24 @@ export default function SubmissionsPage() {
       ))
     : [];
 
-  // 3️⃣ when bank/segment both chosen, fetch approved queries
+  // ── 3) Fetch approved queries when bank+segment set ───
   useEffect(() => {
-    const bankToSend    = selectedBank === 'Others' ? customBank  : selectedBank;
-    const segmentToSend = selectedSegment === 'Others' ? customSegment: selectedSegment;
+    const bankToSend    = selectedBank === 'Others' ? customBank    : selectedBank;
+    const segmentToSend = selectedSegment === 'Others' ? customSegment : selectedSegment;
     if (!bankToSend || !segmentToSend) return;
 
     fetch(`/api/fetch-queries?bank=${encodeURIComponent(bankToSend)}&segment=${encodeURIComponent(segmentToSend)}`)
       .then(r => r.json())
-      .then((data: Query[]) => setQueries(Array.isArray(data) ? data : []))
+      .then((qs: Query[]) => setQueries(Array.isArray(qs) ? qs : []))
       .catch(err => {
         console.error('Error fetching queries:', err);
         setQueries([]);
       });
   }, [selectedBank, selectedSegment, customBank, customSegment]);
 
-  const getBaseQuery = () => customQuery.trim() !== '' ? customQuery : selectedQuery;
+  // ── Helpers ───────────────────────────────────────────
+  const getBaseQuery = () =>
+    customQuery.trim() !== '' ? customQuery : selectedQuery;
 
   const autoResize = () => {
     if (editBoxRef.current) {
@@ -72,10 +81,12 @@ export default function SubmissionsPage() {
     }
   };
 
+  // ── Generate or format ─────────────────────────────────
   const handleGenerate = async () => {
     setLoading(true);
     setFinalDiff('');
     const original = getBaseQuery();
+
     if (formatOnly) {
       const f = format(original);
       setModifiedQuery(f);
@@ -83,6 +94,7 @@ export default function SubmissionsPage() {
       setLoading(false);
       return;
     }
+
     try {
       const res = await fetch('/api/modify-query', {
         method: 'POST',
@@ -100,22 +112,25 @@ export default function SubmissionsPage() {
     }
   };
 
+  // ── Diff highlighting ─────────────────────────────────
   const highlightDiff = (orig: string, mod: string) => {
     const dmp = new DiffMatchPatch();
     const diff = dmp.diff_main(orig, mod);
     dmp.diff_cleanupSemantic(diff);
-    return diff.map(([t, txt]) => {
-      if (t === DiffMatchPatch.DIFF_INSERT) return `<b>${txt}</b>`;
-      if (t === DiffMatchPatch.DIFF_DELETE) return `<del>${txt}</del>`;
-      return txt;
-    }).join('');
+    return diff
+      .map(([t, txt]: [number, string]) => {
+        if (t === DiffMatchPatch.DIFF_INSERT) return `<b>${txt}</b>`;
+        if (t === DiffMatchPatch.DIFF_DELETE) return `<del>${txt}</del>`;
+        return txt;
+      })
+      .join('');
   };
 
   const handleFinalSubmit = () => {
-    const orig = getBaseQuery();
-    setFinalDiff(highlightDiff(orig, editableQuery));
+    setFinalDiff(highlightDiff(getBaseQuery(), editableQuery));
   };
 
+  // ── Send for approval ─────────────────────────────────
   const handleSendForApproval = async () => {
     await fetch('/api/send-for-approval', {
       method: 'POST',
@@ -124,17 +139,19 @@ export default function SubmissionsPage() {
         originalQuery: getBaseQuery(),
         prompt,
         modifiedQuery: editableQuery,
-        // you can include user/bank/segment in the body here as needed
+        bank: selectedBank,
+        segment: selectedSegment,
       }),
     });
     alert('Sent for approval!');
   };
 
+  // ── Render ────────────────────────────────────────────
   return (
     <div className="p-6 max-w-3xl mx-auto">
       <h1 className="text-xl font-bold mb-4">SQL Query Modifier</h1>
 
-      {/* User picks bank & segment */}
+      {/* Bank selector */}
       <div className="mb-4">
         <label className="block font-semibold mb-1">Select Bank:</label>
         <select
@@ -143,7 +160,7 @@ export default function SubmissionsPage() {
           className="w-full p-2 border mb-2"
         >
           <option value="">-- Select Bank --</option>
-          {bankList.map(b => <option key={b} value={b}>{b}</option>)}
+          {bankList.map(b => <option key={b}>{b}</option>)}
           <option value="Others">Others</option>
         </select>
         {selectedBank === 'Others' && (
@@ -156,6 +173,7 @@ export default function SubmissionsPage() {
         )}
       </div>
 
+      {/* Segment selector */}
       <div className="mb-4">
         <label className="block font-semibold mb-1">Select Segment:</label>
         <select
@@ -164,7 +182,7 @@ export default function SubmissionsPage() {
           className="w-full p-2 border mb-2"
         >
           <option value="">-- Select Segment --</option>
-          {filteredSegmentList.map(s => <option key={s} value={s}>{s}</option>)}
+          {filteredSegmentList.map(s => <option key={s}>{s}</option>)}
           <option value="Others">Others</option>
         </select>
         {selectedSegment === 'Others' && (
@@ -177,56 +195,61 @@ export default function SubmissionsPage() {
         )}
       </div>
 
-      {/* Pick or paste an approved query */}
+      {/* Approved queries dropdown */}
       <div className="mb-4">
         <label className="font-semibold">Pick an approved query:</label>
         <select
           className="w-full p-2 border mb-2"
-          onChange={e => setSelectedQuery(e.target.value)}
           value={selectedQuery}
+          onChange={e => setSelectedQuery(e.target.value)}
         >
           <option value="">-- none --</option>
-          {queries.map((q,i)=>(
-            <option key={i} value={q.originalQuery}>{q.originalQuery}</option>
+          {queries.map((q, i) => (
+            <option key={i} value={q.originalQuery}>
+              {q.originalQuery}
+            </option>
           ))}
         </select>
+
         <label className="font-semibold">Or paste your own SQL:</label>
         <textarea
-          className="w-full p-2 border h-24 mb-2"
+          className="w-full p-2 border h-24"
           value={customQuery}
-          onChange={e=>setCustomQuery(e.target.value)}
+          onChange={e => setCustomQuery(e.target.value)}
         />
       </div>
 
-      {/* Prompt and options */}
+      {/* Prompt */}
       <div className="mb-4">
         <label className="font-semibold">Instruction / Prompt:</label>
         <textarea
           className="w-full p-2 border h-20"
           value={prompt}
-          onChange={e=>setPrompt(e.target.value)}
+          onChange={e => setPrompt(e.target.value)}
         />
       </div>
 
+      {/* Format-only toggle */}
       <label className="flex items-center mb-4">
         <input
           type="checkbox"
           className="mr-2"
           checked={formatOnly}
-          onChange={e=>setFormatOnly(e.target.checked)}
+          onChange={e => setFormatOnly(e.target.checked)}
         />
         Only format (no changes)
       </label>
 
+      {/* Generate */}
       <button
-        onClick={handleGenerate}
         disabled={loading}
+        onClick={handleGenerate}
         className="bg-green-600 text-white px-4 py-2 rounded mb-4"
       >
         {loading ? 'Generating…' : 'Generate Modified Query'}
       </button>
 
-      {/* Editor */}
+      {/* Editable result */}
       {modifiedQuery && (
         <div className="mb-6">
           <h2 className="font-semibold">Edit Modified Query</h2>
@@ -234,17 +257,21 @@ export default function SubmissionsPage() {
             ref={editBoxRef}
             className="w-full p-2 border resize-none overflow-hidden"
             value={editableQuery}
-            onChange={e=>{ setEditableQuery(e.target.value); autoResize(); }}
+            onChange={e => { setEditableQuery(e.target.value); autoResize(); }}
             onInput={autoResize}
           />
           <div className="mt-2 flex gap-2">
-            <button onClick={handleFinalSubmit} className="bg-blue-600 text-white px-4 py-2 rounded">Submit Final</button>
-            <button onClick={handleSendForApproval} className="bg-yellow-500 text-white px-4 py-2 rounded">Send for Approval</button>
+            <button onClick={handleFinalSubmit} className="bg-blue-600 text-white px-4 py-2 rounded">
+              Submit Final
+            </button>
+            <button onClick={handleSendForApproval} className="bg-yellow-500 text-white px-4 py-2 rounded">
+              Send for Approval
+            </button>
           </div>
         </div>
       )}
 
-      {/* Diff */}
+      {/* Diff view */}
       {finalDiff && (
         <div>
           <h2 className="font-semibold">Final Diff</h2>
