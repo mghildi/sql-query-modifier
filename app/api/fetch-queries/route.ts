@@ -1,4 +1,3 @@
-// app/api/fetch-queries/route.ts
 import { NextResponse } from 'next/server';
 import { google } from 'googleapis';
 import { Buffer } from 'buffer';
@@ -23,8 +22,6 @@ export async function GET(req: Request) {
   });
   const sheets = google.sheets({ version: 'v4', auth });
 
-  // *** Read Sheet1 – adjust columns to where “approved queries” live ***
-  // e.g. maybe Column C holds the SQL, Column A=bank, B=segment, C=query
   const spreadsheetId = process.env.SHEET_ID!;
   const resp = await sheets.spreadsheets.values.get({
     spreadsheetId,
@@ -32,20 +29,25 @@ export async function GET(req: Request) {
   });
 
   const rows = resp.data.values ?? [];
+
+  // ✅ Add these logs here
+  console.log("✅ Received bank:", bank);
+  console.log("✅ Received segment:", segment);
+  console.log("✅ Sheet rows:", JSON.stringify(rows, null, 2));
+
   const matches = rows
-  .filter(row => row.length >= 3)
-  .filter(([b, s]) =>
-    b?.trim().toLowerCase() === bank.toLowerCase() &&
-    s?.trim().toLowerCase() === segment.toLowerCase()
-  )
-  .map(([, , sql]) => ({
-    originalQuery: (sql || '')
-      .replace(/^"+|"+$/g, '')
-      .replace(/""/g, '"')
-  }));
+    .filter(row => row.length >= 3)
+    .filter(([b, s]) =>
+      b?.trim().toLowerCase() === bank.toLowerCase() &&
+      s?.trim().toLowerCase() === segment.toLowerCase()
+    )
+    .map(([, , sql]) => ({
+      originalQuery: (sql || '')
+        .replace(/^"+|"+$/g, '')
+        .replace(/""/g, '"')
+    }));
 
-
-
+  console.log("✅ Matching queries:", matches);
 
   return NextResponse.json(matches);
 }
