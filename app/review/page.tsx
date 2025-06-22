@@ -119,6 +119,7 @@ export default function ReviewPage() {
         ← Go to Home
       </a>
 
+
       {/* Reviewer */}
       <div className="mb-6">
         <label className="block font-semibold mb-2">Reviewer:</label>
@@ -211,7 +212,7 @@ export default function ReviewPage() {
 
       {/* Empty state */}
       {bank && segment && filtered.length === 0 && (
-        <p>No pending submissions for <em>{bank}</em> / <em>{segment}</em>.</p>
+        <p>No pending submissionss for <em>{bank}</em> / <em>{segment}</em>.</p>
       )}
     </div>
   );
