@@ -133,6 +133,7 @@ export default function SubmissionsPage() {
       submittedBy: approvedBy,
       bank: bank === 'Others' ? customBank.trim() : bank,
       segment: segment === 'Others' ? customSegment.trim() : segment,
+      sheet1RowIndex: selectedRow?.rowIndex || null
     };
     try {
       const r = await fetch('/api/send-for-approval', {
