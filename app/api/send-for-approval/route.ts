@@ -23,6 +23,7 @@ export async function POST(req: Request) {
       submittedBy,
       bank,
       segment,
+      sheet1RowIndex
     } = await req.json();
 
     const spreadsheetId = '1GwTyj7g0pbqyvwBiWbUXHi_J1qboJ2rryXgCXtpnvLM';
@@ -55,7 +56,28 @@ export async function POST(req: Request) {
       valueInputOption: 'USER_ENTERED',
       requestBody: { values },
     });
+    if (sheet1RowIndex !== null && sheet1RowIndex !== undefined) {
+      const sheetMeta = await sheets.spreadsheets.get({ spreadsheetId });
+      const sheet1Id = sheetMeta.data.sheets!
+        .find(s => s.properties?.title === 'Sheet1')!
+        .properties!.sheetId!;
 
+      await sheets.spreadsheets.batchUpdate({
+        spreadsheetId,
+        requestBody: {
+          requests: [{
+            deleteDimension: {
+              range: {
+                sheetId: sheet1Id,
+                dimension: 'ROWS',
+                startIndex: sheet1RowIndex - 1, // zero-based
+                endIndex: sheet1RowIndex       // exclusive
+              }
+            }
+          }]
+        }
+      });
+    }
     return NextResponse.json({ status: 'submitted' });
   } catch (err: any) {
     console.error('Error in send-for-approval API:', err);
