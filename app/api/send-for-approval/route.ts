@@ -56,6 +56,10 @@ export async function POST(req: Request) {
       valueInputOption: 'USER_ENTERED',
       requestBody: { values },
     });
+    console.log('Received row index:', sheet1RowIndex);
+    if (sheet1RowIndex !== null && sheet1RowIndex !== undefined) {
+      console.log('Attempting to delete from Sheet1 at row:', sheet1RowIndex);
+    }
     if (sheet1RowIndex !== null && sheet1RowIndex !== undefined) {
       const sheetMeta = await sheets.spreadsheets.get({ spreadsheetId });
       const sheet1Id = sheetMeta.data.sheets!
