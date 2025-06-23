@@ -11,7 +11,8 @@ export default function SubmissionsPage() {
   const [bankList, setBankList] = useState<string[]>([]);
   const [fullSegmentList, setFullSegmentList] = useState<{ bank: string; segment: string }[]>([]);
   const [filteredSegments, setFilteredSegments] = useState<string[]>([]);
-  const [queries, setQueries] = useState<{ originalQuery: string }[]>([]);
+  const [queries, setQueries] = useState<{ originalQuery: string; rowIndex?: number }[]>([]);
+
 
   // --- Selection state ---
   const [user, setUser] = useState('Mohit');
@@ -115,7 +116,7 @@ export default function SubmissionsPage() {
     dmp.diff_cleanupSemantic(diff);
     const html = diff.map(([t,txt]: [number,string]) =>
       t === DiffMatchPatch.DIFF_INSERT
-        ? `<b>${txt}</b>`
+        ? `<b style="color:red;">${txt}</b>`
         : t === DiffMatchPatch.DIFF_DELETE
           ? `<del>${txt}</del>`
           : txt
@@ -126,6 +127,7 @@ export default function SubmissionsPage() {
   // --- Send into “Submissions” sheet for approval ---
   const handleSubmit = async () => {
     const approvedBy = user === 'Others' ? customUser.trim() || 'Unknown' : user;
+    const selectedRow = queries.find(q => q.originalQuery === selectedQuery);
     const payload = {
       originalQuery: baseQuery(),
       prompt,
