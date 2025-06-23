@@ -14,6 +14,7 @@ function loadServiceAccount() {
   return svc;
 }
 
+
 export async function POST(req: Request) {
   try {
     const {
@@ -25,6 +26,15 @@ export async function POST(req: Request) {
       segment,
       sheet1RowIndex
     } = await req.json();
+    console.log('Payload received:', {
+      originalQuery,
+      prompt,
+      modifiedQuery,
+      submittedBy,
+      bank,
+      segment,
+      sheet1RowIndex
+    });
 
     const spreadsheetId = '1GwTyj7g0pbqyvwBiWbUXHi_J1qboJ2rryXgCXtpnvLM';
 
