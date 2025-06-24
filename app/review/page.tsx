@@ -46,8 +46,8 @@ export default function ReviewPage() {
     fetch('/api/fetch-submissions')
       .then(res => res.json())
       .then((data: Submission[]) => {
-        const pending = data.filter(d => d.Status === 'Pending');
-        setSubmissions(pending);
+        
+        setSubmissions(data);
       });
   }, []);
 
@@ -102,7 +102,7 @@ export default function ReviewPage() {
     dmp.diff_cleanupSemantic(diff);
     return diff
       .map(([type, text]: [number, string]) => {
-        if (type === DiffMatchPatch.DIFF_INSERT) return `<b>${text}</b>`;
+        if (type === DiffMatchPatch.DIFF_INSERT) return `<b style="color:red;">${text}</b>`;
         if (type === DiffMatchPatch.DIFF_DELETE) return `<del>${text}</del>`;
         return text;
       })
