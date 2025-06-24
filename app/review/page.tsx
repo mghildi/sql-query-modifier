@@ -31,23 +31,22 @@ export default function ReviewPage() {
   const [reviewer, setReviewer] = useState('Mohit');
   const [customReviewer, setCustomReviewer] = useState('');
 
-  // Fetch master bank/segment mapping
-  useEffect(() => {
-    fetch('/api/fetch-bank-segment')
-      .then(res => res.json())
-      .then(data => {
-        setBanks(data.bankNames || []);
-        setMapping(data.segmentMapping || []);
-      });
-  }, []);
-
-  // Fetch all pending submissions
+  // Fetch all submissions and derive bank/segment mapping from it
   useEffect(() => {
     fetch('/api/fetch-submissions')
       .then(res => res.json())
       .then((data: Submission[]) => {
-        
         setSubmissions(data);
+
+        // Derive bank list
+        const banksFromSubmissions = [...new Set(data.map(d => d.BankName).filter(Boolean))];
+        setBanks(banksFromSubmissions);
+
+        // Derive mapping
+        const mappingsFromSubmissions = data
+          .filter(d => d.BankName && d.Segment)
+          .map(d => ({ bank: d.BankName, segment: d.Segment }));
+        setMapping(mappingsFromSubmissions);
       });
   }, []);
 
@@ -118,7 +117,6 @@ export default function ReviewPage() {
       >
         ← Go to Home
       </a>
-
 
       {/* Reviewer */}
       <div className="mb-6">
@@ -212,7 +210,7 @@ export default function ReviewPage() {
 
       {/* Empty state */}
       {bank && segment && filtered.length === 0 && (
-        <p>No pending submissionss for <em>{bank}</em> / <em>{segment}</em>.</p>
+        <p>No submissions found for <em>{bank}</em> / <em>{segment}</em>.</p>
       )}
     </div>
   );
