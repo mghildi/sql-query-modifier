@@ -30,24 +30,17 @@ export async function GET(req: Request) {
 
   const rows = resp.data.values ?? [];
 
-  // ✅ Add these logs here
-  console.log("✅ Received bank:", bank);
-  console.log("✅ Received segment:", segment);
-  console.log("✅ Sheet rows:", JSON.stringify(rows, null, 2));
-
   const matches = rows
-    .filter(row => row.length >= 3)
-    .filter(([b, s]) =>
-      b?.trim().toLowerCase() === bank.toLowerCase() &&
-      s?.trim().toLowerCase() === segment.toLowerCase()
+    .map((row, index) => ({ row, index: index + 2 })) // add 2 to get actual sheet row index
+    .filter(({ row }) => row.length >= 3)
+    .filter(({ row }) =>
+      row[0]?.trim().toLowerCase() === bank.toLowerCase() &&
+      row[1]?.trim().toLowerCase() === segment.toLowerCase()
     )
-    .map(([, , sql]) => ({
-      originalQuery: (sql || '')
-        .replace(/^"+|"+$/g, '')
-        .replace(/""/g, '"')
+    .map(({ row, index }) => ({
+      originalQuery: (row[2] || '').replace(/^"+|"+$/g, '').replace(/""/g, '"'),
+      rowIndex: index
     }));
-
-  console.log("✅ Matching queries:", matches);
 
   return NextResponse.json(matches);
 }
