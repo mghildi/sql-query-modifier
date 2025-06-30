@@ -137,14 +137,19 @@ export default function SubmissionsPage() {
 
     setFinalDiff(html);
   };
-
+  const minifySQL = (sql: string): string =>
+    sql
+    .replace(/--.*$/gm, '')            // remove single-line comments
+    .replace(/\/\*[\s\S]*?\*\//g, '')  // remove block comments
+    .replace(/\s+/g, ' ')              // collapse all whitespace
+    .trim();
   const handleSubmit = async () => {
     const approvedBy = user === 'Others' ? customUser.trim() || 'Unknown' : user;
     const selectedRow = queries.find(q => q.originalQuery === selectedQuery);
     const payload = {
       originalQuery: baseQuery(),
       prompt,
-      modifiedQuery: editableQuery,
+      modifiedQuery: minifySQL(editableQuery),
       submittedBy: approvedBy,
       bank: bank === 'Others' ? customBank.trim() : bank,
       segment: segment === 'Others' ? customSegment.trim() : segment,

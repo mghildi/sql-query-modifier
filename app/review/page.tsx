@@ -37,23 +37,24 @@ export default function ReviewPage() {
       .then(res => res.json())
       .then((data: Submission[]) => {
         setSubmissions(data);
-
-        // Derive bank list
-        const banksFromSubmissions = [...new Set(data.map(d => d.BankName).filter(Boolean))];
-        setBanks(banksFromSubmissions);
-
-        // Derive mapping
-        const mappingsFromSubmissions = data
-          .filter(d => d.BankName && d.Segment)
-          .map(d => ({ bank: d.BankName, segment: d.Segment }));
-        setMapping(mappingsFromSubmissions);
+        setBanks([...new Set(data.map(d => d.BankName).filter(Boolean))]);
+        setMapping(
+          data
+            .filter(d => d.BankName && d.Segment)
+            .map(d => ({ bank: d.BankName, segment: d.Segment }))
+        );
       });
   }, []);
 
   // Update segments when bank is selected
   useEffect(() => {
-    if (!bank) return setSegments([]);
-    const segs = mapping.filter(m => m.bank === bank).map(m => m.segment);
+    if (!bank) {
+      setSegments([]);
+      return;
+    }
+    const segs = mapping
+      .filter(m => m.bank === bank)
+      .map(m => m.segment);
     setSegments(Array.from(new Set(segs)));
     setSegment('');
     setFiltered([]);
@@ -61,7 +62,10 @@ export default function ReviewPage() {
 
   // Filter submissions for selected bank & segment
   useEffect(() => {
-    if (!bank || !segment) return setFiltered([]);
+    if (!bank || !segment) {
+      setFiltered([]);
+      return;
+    }
     setFiltered(
       submissions.filter(s => s.BankName === bank && s.Segment === segment)
     );
@@ -70,16 +74,34 @@ export default function ReviewPage() {
   const reviewerName =
     reviewer === 'Others' ? customReviewer.trim() || 'Unknown' : reviewer;
 
+  // Helper to strip comments + collapse whitespace
+  const minifySQL = (sql: string): string => {
+    return sql
+      .replace(/--.*$/gm, '')            // remove single-line comments
+      .replace(/\/\*[\s\S]*?\*\//g, '')  // remove block comments
+      .replace(/\s+/g, ' ')              // collapse whitespace
+      .trim();
+  };
+
   const handleDecision = async (
     item: Submission,
     action: 'approve' | 'reject'
   ) => {
     const url =
       action === 'approve' ? '/api/approve-submission' : '/api/reject-submission';
-    const body =
+
+    // If approving, minify the ModifiedQuery and include it
+    const body: Record<string, any> =
       action === 'approve'
-        ? { rowIndex: item.rowIndex, approvedBy: reviewerName }
-        : { rowIndex: item.rowIndex, rejectedBy: reviewerName };
+        ? {
+            rowIndex: item.rowIndex,
+            approvedBy: reviewerName,
+            approvedQuery: minifySQL(item.ModifiedQuery),
+          }
+        : {
+            rowIndex: item.rowIndex,
+            rejectedBy: reviewerName,
+          };
 
     await fetch(url, {
       method: 'POST',
@@ -91,32 +113,34 @@ export default function ReviewPage() {
     setSubmissions(s => s.filter(r => r.rowIndex !== item.rowIndex));
     setFiltered(f => f.filter(r => r.rowIndex !== item.rowIndex));
 
-    alert(`${action === 'approve' ? 'Approved' : 'Rejected'} by ${reviewerName}`);
+    alert(
+      action === 'approve'
+        ? `Approved (minified) by ${reviewerName}`
+        : `Rejected by ${reviewerName}`
+    );
   };
 
   const highlightDiff = (orig: string, mod: string) => {
     if (!orig || !mod) return '<i>Missing query</i>';
     const dmp = new DiffMatchPatch();
-
-    // 1) Turn SQL into tokens (words & punctuation)
     const tokenize = (sql: string) =>
       (sql.match(/\w+|[^\s\w]+/g) || [])
         .map(t => t.trim())
         .filter(Boolean);
-
     const origTokens = tokenize(orig);
-    const modTokens  = tokenize(mod);
-
-    // 2) Diff one token per line
-    const diffs = dmp.diff_main(origTokens.join('\n'), modTokens.join('\n'));
+    const modTokens = tokenize(mod);
+    const diffs = dmp.diff_main(
+      origTokens.join('\n'),
+      modTokens.join('\n')
+    );
     dmp.diff_cleanupSemantic(diffs);
-
-    // 3) Rebuild HTML
     return diffs
       .map(([op, txt]: [number, string]) => {
         const token = txt.replace(/\n/g, '');
-        if (op === DiffMatchPatch.DIFF_INSERT)  return `<b style="color:red;">${token}</b> `;
-        if (op === DiffMatchPatch.DIFF_DELETE)  return `<del>${token}</del> `;
+        if (op === DiffMatchPatch.DIFF_INSERT)
+          return `<b style="color:red;">${token}</b> `;
+        if (op === DiffMatchPatch.DIFF_DELETE)
+          return `<del>${token}</del> `;
         return `${token} `;
       })
       .join('')
@@ -196,29 +220,40 @@ export default function ReviewPage() {
 
       {/* Submissions List */}
       {filtered.map(item => (
-        <div key={item.rowIndex} className="border rounded p-4 mb-4 bg-white">
-          <p><strong>Submitted By:</strong> {item.SubmittedBy}</p>
-          <p><strong>Prompt:</strong> {item.Prompt}</p>
-
-          {/* Raw queries */}
-          <p className="mt-4"><strong>Original Query:</strong></p>
+        <div
+          key={item.rowIndex}
+          className="border rounded p-4 mb-4 bg-white"
+        >
+          <p>
+            <strong>Submitted By:</strong> {item.SubmittedBy}
+          </p>
+          <p>
+            <strong>Prompt:</strong> {item.Prompt}
+          </p>
+          <p className="mt-4">
+            <strong>Original Query:</strong>
+          </p>
           <pre className="bg-gray-50 p-2 rounded text-sm overflow-auto">
             {item.OriginalQuery}
           </pre>
-          <p className="mt-2"><strong>Modified Query:</strong></p>
+          <p className="mt-2">
+            <strong>Modified Query:</strong>
+          </p>
           <pre className="bg-gray-50 p-2 rounded text-sm overflow-auto">
             {item.ModifiedQuery}
           </pre>
-
-          {/* Diff view */}
-          <p className="mt-4"><strong>Changes:</strong></p>
+          <p className="mt-4">
+            <strong>Changes:</strong>
+          </p>
           <div
             className="bg-gray-100 p-2 rounded whitespace-pre-wrap break-words"
             dangerouslySetInnerHTML={{
-              __html: highlightDiff(item.OriginalQuery, item.ModifiedQuery),
+              __html: highlightDiff(
+                item.OriginalQuery,
+                item.ModifiedQuery
+              ),
             }}
           />
-
           <div className="mt-4 flex gap-2">
             <button
               onClick={() => handleDecision(item, 'approve')}
@@ -238,7 +273,10 @@ export default function ReviewPage() {
 
       {/* Empty state */}
       {bank && segment && filtered.length === 0 && (
-        <p>No submissions found for <em>{bank}</em> / <em>{segment}</em>.</p>
+        <p>
+          No submissions found for <em>{bank}</em> /{' '}
+          <em>{segment}</em>.
+        </p>
       )}
     </div>
   );
