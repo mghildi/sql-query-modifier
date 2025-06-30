@@ -1,4 +1,3 @@
-// app/submissions/page.tsx
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
@@ -7,14 +6,11 @@ import { format } from 'sql-formatter';
 import Link from 'next/link';
 
 export default function SubmissionsPage() {
-  // --- Data state ---
   const [bankList, setBankList] = useState<string[]>([]);
   const [fullSegmentList, setFullSegmentList] = useState<{ bank: string; segment: string }[]>([]);
   const [filteredSegments, setFilteredSegments] = useState<string[]>([]);
   const [queries, setQueries] = useState<{ originalQuery: string; rowIndex?: number }[]>([]);
 
-
-  // --- Selection state ---
   const [user, setUser] = useState('Mohit');
   const [customUser, setCustomUser] = useState('');
   const [bank, setBank] = useState('');
@@ -26,14 +22,12 @@ export default function SubmissionsPage() {
   const [prompt, setPrompt] = useState('');
   const [formatOnly, setFormatOnly] = useState(false);
 
-  // --- Editing & diff state ---
   const [modifiedQuery, setModifiedQuery] = useState('');
   const [editableQuery, setEditableQuery] = useState('');
   const [finalDiff, setFinalDiff] = useState('');
   const [loading, setLoading] = useState(false);
   const editRef = useRef<HTMLTextAreaElement>(null);
 
-  // --- Load bank/segment mapping on mount ---
   useEffect(() => {
     fetch('/api/fetch-bank-segment')
       .then(r => r.json())
@@ -43,13 +37,10 @@ export default function SubmissionsPage() {
       });
   }, []);
 
-  // --- When bank changes, recompute segments ---
   useEffect(() => {
     const b = bank === 'Others' ? customBank.trim() : bank;
     if (b) {
-      const segs = fullSegmentList
-        .filter(x => x.bank === b)
-        .map(x => x.segment);
+      const segs = fullSegmentList.filter(x => x.bank === b).map(x => x.segment);
       setFilteredSegments(Array.from(new Set(segs)));
     } else {
       setFilteredSegments([]);
@@ -58,7 +49,6 @@ export default function SubmissionsPage() {
     setQueries([]);
   }, [bank, customBank, fullSegmentList]);
 
-  // --- When bank+segment set, fetch approved queries ---
   useEffect(() => {
     const b = bank === 'Others' ? customBank.trim() : bank;
     const s = segment === 'Others' ? customSegment.trim() : segment;
@@ -70,7 +60,6 @@ export default function SubmissionsPage() {
     }
   }, [bank, customBank, segment, customSegment]);
 
-  // --- Helpers ---
   const baseQuery = () => customQuery.trim() || selectedQuery;
 
   const autoResize = () => {
@@ -80,18 +69,21 @@ export default function SubmissionsPage() {
     }
   };
 
-  // --- Generate or format via API ---
   const handleGenerate = async () => {
     setLoading(true);
     setFinalDiff('');
     const orig = baseQuery();
     if (formatOnly) {
-      const f = format(orig);
+      const f = orig
+        .replace(/\s+/g, ' ')
+        .replace(/\s*([(),=<>])\s*/g, '$1')
+        .trim();
       setModifiedQuery(f);
       setEditableQuery(f);
       setLoading(false);
       return;
     }
+
     try {
       const res = await fetch('/api/modify-query', {
         method: 'POST',
@@ -109,22 +101,43 @@ export default function SubmissionsPage() {
     }
   };
 
-  // --- Highlight diff & show final change before approval ---
+  const normalizeSQLForDiff = (sql: string) =>
+    sql
+      .replace(/\bNOT\s+IN\b/gi, '__NOTIN__')      // tag "NOT IN" for atomic comparison
+      .replace(/\s*([=<>(),])\s*/g, ' $1 ')        // normalize symbol spacing
+      .replace(/\s+/g, ' ')                        // collapse multiple spaces
+      .trim();
   const handleFinal = () => {
     const dmp = new DiffMatchPatch();
-    const diff = dmp.diff_main(baseQuery().replace(/\s+/g,' ').trim(), editableQuery.replace(/\s+/g,' ').trim());
+
+    // Step 1: turn SQL into tokens
+    const tokenize = (sql: string) =>
+      (sql.match(/\w+|[^\s\w]+/g) || [])
+        .map(t => t.trim())
+        .filter(Boolean);
+
+    // Step 2: get token lists
+    const origTokens = tokenize(baseQuery());
+    const modTokens  = tokenize(editableQuery);
+
+    // Step 3: diff on one‐token per line
+    const diff = dmp.diff_main(origTokens.join('\n'), modTokens.join('\n'));
     dmp.diff_cleanupSemantic(diff);
-    const html = diff.map(([t,txt]: [number,string]) =>
-      t === DiffMatchPatch.DIFF_INSERT
-        ? `<b style="color:red;">${txt}</b>`
-        : t === DiffMatchPatch.DIFF_DELETE
-          ? `<del>${txt}</del>`
-          : txt
-    ).join('');
+
+    // Step 4: rebuild HTML, *always* adding a trailing space*
+    const html = diff
+      .map(([op, txt]: [number, string]) => {
+        const token = txt.replace(/\n/g, '');
+        if (op === DiffMatchPatch.DIFF_INSERT)  return `<b style="color:red;">${token}</b> `;
+        if (op === DiffMatchPatch.DIFF_DELETE)  return `<del>${token}</del> `;
+        return `${token} `;
+      })
+      .join('')
+      .trim();
+
     setFinalDiff(html);
   };
 
-  // --- Send into “Submissions” sheet for approval ---
   const handleSubmit = async () => {
     const approvedBy = user === 'Others' ? customUser.trim() || 'Unknown' : user;
     const selectedRow = queries.find(q => q.originalQuery === selectedQuery);
@@ -314,7 +327,7 @@ export default function SubmissionsPage() {
         <div className="mt-6">
           <h2 className="font-semibold">Final Diff</h2>
           <div
-            className="bg-gray-100 p-4 rounded whitespace-pre-wrap"
+            className="bg-gray-100 p-4 rounded whitespace-pre-wrap break-words"
             dangerouslySetInnerHTML={{ __html: finalDiff }}
           />
         </div>

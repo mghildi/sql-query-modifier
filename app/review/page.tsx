@@ -97,15 +97,30 @@ export default function ReviewPage() {
   const highlightDiff = (orig: string, mod: string) => {
     if (!orig || !mod) return '<i>Missing query</i>';
     const dmp = new DiffMatchPatch();
-    const diff = dmp.diff_main(orig, mod);
-    dmp.diff_cleanupSemantic(diff);
-    return diff
-      .map(([type, text]: [number, string]) => {
-        if (type === DiffMatchPatch.DIFF_INSERT) return `<b style="color:red;">${text}</b>`;
-        if (type === DiffMatchPatch.DIFF_DELETE) return `<del>${text}</del>`;
-        return text;
+
+    // 1) Turn SQL into tokens (words & punctuation)
+    const tokenize = (sql: string) =>
+      (sql.match(/\w+|[^\s\w]+/g) || [])
+        .map(t => t.trim())
+        .filter(Boolean);
+
+    const origTokens = tokenize(orig);
+    const modTokens  = tokenize(mod);
+
+    // 2) Diff one token per line
+    const diffs = dmp.diff_main(origTokens.join('\n'), modTokens.join('\n'));
+    dmp.diff_cleanupSemantic(diffs);
+
+    // 3) Rebuild HTML
+    return diffs
+      .map(([op, txt]: [number, string]) => {
+        const token = txt.replace(/\n/g, '');
+        if (op === DiffMatchPatch.DIFF_INSERT)  return `<b style="color:red;">${token}</b> `;
+        if (op === DiffMatchPatch.DIFF_DELETE)  return `<del>${token}</del> `;
+        return `${token} `;
       })
-      .join('');
+      .join('')
+      .trim();
   };
 
   return (
@@ -184,13 +199,26 @@ export default function ReviewPage() {
         <div key={item.rowIndex} className="border rounded p-4 mb-4 bg-white">
           <p><strong>Submitted By:</strong> {item.SubmittedBy}</p>
           <p><strong>Prompt:</strong> {item.Prompt}</p>
-          <p className="mt-2"><strong>Changes:</strong></p>
+
+          {/* Raw queries */}
+          <p className="mt-4"><strong>Original Query:</strong></p>
+          <pre className="bg-gray-50 p-2 rounded text-sm overflow-auto">
+            {item.OriginalQuery}
+          </pre>
+          <p className="mt-2"><strong>Modified Query:</strong></p>
+          <pre className="bg-gray-50 p-2 rounded text-sm overflow-auto">
+            {item.ModifiedQuery}
+          </pre>
+
+          {/* Diff view */}
+          <p className="mt-4"><strong>Changes:</strong></p>
           <div
-            className="bg-gray-100 p-2 rounded whitespace-pre-wrap"
+            className="bg-gray-100 p-2 rounded whitespace-pre-wrap break-words"
             dangerouslySetInnerHTML={{
               __html: highlightDiff(item.OriginalQuery, item.ModifiedQuery),
             }}
           />
+
           <div className="mt-4 flex gap-2">
             <button
               onClick={() => handleDecision(item, 'approve')}
