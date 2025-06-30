@@ -12,7 +12,7 @@ export async function GET(req: Request) {
   const { searchParams } = new URL(req.url);
   const bank    = searchParams.get('bank')!;
   const segment = searchParams.get('segment')!;
-
+  console.log("Received in API:", bank, segment);
   const svc = loadServiceAccount();
   svc.private_key = svc.private_key.replace(/\\n/g, '\n');
 
@@ -29,18 +29,33 @@ export async function GET(req: Request) {
   });
 
   const rows = resp.data.values ?? [];
+  // Log all rows to see potential near matches
+  rows.forEach((row, i) => {
+    const b = row[0]?.trim().toLowerCase();
+    const s = row[1]?.trim().toLowerCase();
+    const targetB = bank.trim().toLowerCase();
+    const targetS = segment.trim().toLowerCase();
+
+    // Log if either part is close to matching
+    if (b?.includes(targetB) || s?.includes(targetS)) {
+      console.log(`Possible match at row ${i + 2}: bank="${b}", segment="${s}"`);
+    }
+  });
+  const normalize = (str: string) =>
+  str.replace(/\s+/g, ' ').trim().toLowerCase();
 
   const matches = rows
     .map((row, index) => ({ row, index: index + 2 })) // add 2 to get actual sheet row index
     .filter(({ row }) => row.length >= 3)
     .filter(({ row }) =>
-      row[0]?.trim().toLowerCase() === bank.toLowerCase() &&
-      row[1]?.trim().toLowerCase() === segment.toLowerCase()
+      normalize(row[0]) === normalize(bank) &&
+      normalize(row[1]) === normalize(segment)
+      
     )
     .map(({ row, index }) => ({
       originalQuery: (row[2] || '').replace(/^"+|"+$/g, '').replace(/""/g, '"'),
       rowIndex: index
     }));
-
+  console.log("Matched rows:", matches.length);
   return NextResponse.json(matches);
 }
