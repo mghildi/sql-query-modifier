@@ -1,7 +1,13 @@
 // app/api/approve-submission/route.ts
+
 import { google } from 'googleapis';
 import { NextResponse } from 'next/server';
 import { Buffer } from 'buffer';
+import { format } from 'date-fns-tz';
+
+const istTimestamp = format(new Date(), "yyyy-MM-dd'T'HH:mm:ss", {
+  timeZone: 'Asia/Kolkata'
+});
 
 // === NEW helper to load the service account ===
 function loadServiceAccount() {
@@ -38,15 +44,15 @@ export async function POST(req: Request) {
 
     // Append to Approved
     const approvedValues = [
-      row[0], // OriginalQuery
-      row[1], // Prompt
-      row[2], // ModifiedQuery
+      istTimestamp,
+      row[1], // Bank
+      row[2], // Segment
+      row[3], // OriginalQuery
+      row[4], // ModifiedQuery
       'Approved',
-      row[4], // SubmittedBy
+      row[6], // SubmittedBy
       approvedBy,
-      new Date().toISOString(),
-      row[7], // BankName
-      row[8], // Segment
+    
     ];
     await sheets.spreadsheets.values.append({
       spreadsheetId,

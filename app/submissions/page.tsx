@@ -27,6 +27,8 @@ export default function SubmissionsPage() {
   const [finalDiff, setFinalDiff] = useState('');
   const [loading, setLoading] = useState(false);
   const editRef = useRef<HTMLTextAreaElement>(null);
+  const [complianceLoading, setComplianceLoading] = useState(false)
+  const [complianceResult, setComplianceResult]   = useState('')
 
   useEffect(() => {
     fetch('/api/fetch-bank-segment')
@@ -38,7 +40,8 @@ export default function SubmissionsPage() {
   }, []);
 
   useEffect(() => {
-    const b = bank === 'Others' ? customBank.trim() : bank;
+    const b = bank === 'Others' ? (customBank || '').trim() : bank;
+
     if (b) {
       const segs = fullSegmentList.filter(x => x.bank === b).map(x => x.segment);
       setFilteredSegments(Array.from(new Set(segs)));
@@ -49,18 +52,40 @@ export default function SubmissionsPage() {
     setQueries([]);
   }, [bank, customBank, fullSegmentList]);
 
+  // after you load bankList & fullSegmentList...
   useEffect(() => {
     const b = bank === 'Others' ? customBank.trim() : bank;
-    const s = segment === 'Others' ? customSegment.trim() : segment;
+    const s = segment === 'Others' ? (customSegment || '').trim() : segment;
     if (b && s) {
       fetch(`/api/fetch-queries?bank=${encodeURIComponent(b)}&segment=${encodeURIComponent(s)}`)
         .then(r => r.json())
-        .then(d => setQueries(Array.isArray(d) ? d : []))
-        .catch(() => setQueries([]));
+        .then((d: Array<{ originalQuery: string; rowIndex?: number }>) => {
+          setQueries(d);
+          if (d.length > 0) {
+            // take the first returned query and populate the editor
+            setEditableQuery(d[0].originalQuery);
+            setModifiedQuery(d[0].originalQuery);
+            setSelectedQuery(d[0].originalQuery);
+          } else {
+            // clear if none
+            setEditableQuery('');
+            setModifiedQuery('');
+          }
+        })
+        .catch(() => {
+          setQueries([]);
+          setEditableQuery('');
+          setModifiedQuery('');
+        });
+    } else {
+      setQueries([]);
+      setEditableQuery('');
+      setModifiedQuery('');
     }
   }, [bank, customBank, segment, customSegment]);
 
-  const baseQuery = () => customQuery.trim() || selectedQuery;
+  const baseQuery = () => (customQuery || '').trim() || selectedQuery;
+  
 
   const autoResize = () => {
     if (editRef.current) {
@@ -68,7 +93,39 @@ export default function SubmissionsPage() {
       editRef.current.style.height = editRef.current.scrollHeight + 'px';
     }
   };
+  useEffect(() => {
+    autoResize();
+}, [editableQuery]);
+  const handleComplianceCheck = async () => {
+    setComplianceLoading(true);
+    try {
+      const res = await fetch('/api/compliance-check', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ query: editableQuery })
+      });
 
+      const { result } = await res.json();
+      setComplianceResult(result);
+    } catch (e: any) {
+      setComplianceResult(`Error: ${e.message}`);
+    } finally {
+      setComplianceLoading(false);
+    }
+  };
+  
+  // after you fetch & set complianceResult…
+// After you’ve done `setComplianceResult(result)`:
+  const errorExplanation = (complianceResult
+    || '').trim()
+    .replace(/^\[(?:✔️|❌)\]\s*/, '')
+
+
+
+
+
+
+  
   const handleGenerate = async () => {
     setLoading(true);
     setFinalDiff('');
@@ -101,58 +158,81 @@ export default function SubmissionsPage() {
     }
   };
 
-  const normalizeSQLForDiff = (sql: string) =>
-    sql
-      .replace(/\bNOT\s+IN\b/gi, '__NOTIN__')      // tag "NOT IN" for atomic comparison
-      .replace(/\s*([=<>(),])\s*/g, ' $1 ')        // normalize symbol spacing
-      .replace(/\s+/g, ' ')                        // collapse multiple spaces
-      .trim();
+  // const normalizeSQLForDiff = (sql: string) =>
+  //   sql
+  //     .replace(/\bNOT\s+IN\b/gi, '__NOTIN__')      // tag "NOT IN" for atomic comparison
+  //     .replace(/\s*([=<>(),])\s*/g, ' $1 ')        // normalize symbol spacing
+  //     .replace(/\s{2,}/g, ' ')                        // collapse multiple spaces
+  //     .trim();
   const handleFinal = () => {
     const dmp = new DiffMatchPatch();
-
+    
     // Step 1: turn SQL into tokens
+    // const tokenize = (sql: string) =>
+    //   (sql.match(/\w+|[^\s\w]+/g) || [])
+    //     .map(t => t.trim())
+    //     .filter(Boolean);
+
+    // // Step 2: get token lists
+    // const origTokens = tokenize(baseQuery());
+    // const modTokens  = tokenize(editableQuery);
+
+    // Step 3: diff on one‐token per line
+    const origNorm = minifySQL(baseQuery());
+    const modNorm  = minifySQL(editableQuery);
+        // Step 1: turn SQL into tokens
     const tokenize = (sql: string) =>
       (sql.match(/\w+|[^\s\w]+/g) || [])
-        .map(t => t.trim())
+        .map(t => t.trim().toLowerCase())
         .filter(Boolean);
 
     // Step 2: get token lists
-    const origTokens = tokenize(baseQuery());
-    const modTokens  = tokenize(editableQuery);
-
-    // Step 3: diff on one‐token per line
+    // const origTokens = tokenize(origNorm);
+    // const modTokens  = tokenize(modNorm);
+    const origTokens = tokenize(minifySQL(baseQuery()));
+    const modTokens = tokenize(minifySQL(editableQuery));
+    // const diff = dmp.diff_main(origTokens.join(' '), modTokens.join(' '));
     const diff = dmp.diff_main(origTokens.join('\n'), modTokens.join('\n'));
+    
+
     dmp.diff_cleanupSemantic(diff);
 
     // Step 4: rebuild HTML, *always* adding a trailing space*
+    // const origTokens = tokenize(minifySQL(baseQuery()));
+    // const modTokens = tokenize(minifySQL(editableQuery));
+
+    // const diff = dmp.diff_main(origTokens.join('\n'), modTokens.join('\n'));
+    // dmp.diff_cleanupSemantic(diff); // optional
+
     const html = diff
       .map(([op, txt]: [number, string]) => {
-        const token = txt.replace(/\n/g, '');
-        if (op === DiffMatchPatch.DIFF_INSERT)  return `<b style="color:red;">${token}</b> `;
-        if (op === DiffMatchPatch.DIFF_DELETE)  return `<del>${token}</del> `;
+        const token = txt.replace(/\n/g, ' ');
+        if (op === DiffMatchPatch.DIFF_INSERT) return `<b style="color:red;">${token}</b> `;
+        if (op === DiffMatchPatch.DIFF_DELETE) return `<del style="color:red;">${token}</del> `;
         return `${token} `;
       })
       .join('')
       .trim();
+
 
     setFinalDiff(html);
   };
   const minifySQL = (sql: string): string =>
     sql
     .replace(/--.*$/gm, '')            // remove single-line comments
-    .replace(/\/\*[\s\S]*?\*\//g, '')  // remove block comments
-    .replace(/\s+/g, ' ')              // collapse all whitespace
+    .replace(/\/\*[\s\S]*?\*\//g, ' ')  // remove block comments
+    .replace(/\s{2,}/g, ' ')              // collapse all whitespace
     .trim();
   const handleSubmit = async () => {
-    const approvedBy = user === 'Others' ? customUser.trim() || 'Unknown' : user;
+    const approvedBy = user === 'Others' ? (customUser || '').trim() || 'Unknown' : user;
     const selectedRow = queries.find(q => q.originalQuery === selectedQuery);
     const payload = {
       originalQuery: baseQuery(),
       prompt,
-      modifiedQuery: minifySQL(editableQuery),
+      modifiedQuery: editableQuery,
       submittedBy: approvedBy,
-      bank: bank === 'Others' ? customBank.trim() : bank,
-      segment: segment === 'Others' ? customSegment.trim() : segment,
+      bank: bank === 'Others' ? (customBank || '').trim() : bank,
+      segment: segment === 'Others' ? (customSegment || '').trim() : segment,
       sheet1RowIndex: selectedRow?.rowIndex || null
     };
     try {
@@ -167,6 +247,18 @@ export default function SubmissionsPage() {
       alert('Network error');
     }
   };
+  // inside SubmissionsPage, before the return:
+
+  // derive an array of { ok, text } from the raw LLM output
+  const checklist = (complianceResult || '')
+    .split('\n')
+    .filter(line => /^[-•*]\s+/.test(line.trim()))
+    .map(line => ({
+      text: line.replace(/^[-•*]\s+/, '').trim()
+    }));
+
+
+
 
   return (
     <div className="p-6 max-w-3xl mx-auto">
@@ -176,129 +268,113 @@ export default function SubmissionsPage() {
           <button className="bg-blue-600 text-white px-3 py-1 rounded">Go to Review</button>
         </Link>
       </div>
+      <a
+        href="/"
+        className="inline-block mb-4 text-blue-600 underline hover:text-blue-800"
+      >
+        ← Go to Home
+      </a>
+      <div className="flex justify-end">
+        <button
+        onClick = {() => window.location.reload()}
+        className ="bg-gray-200 hover:bg-gray-300 text-gray-800 px-3 py-1 rounded"
+        > 
+        🔄 Refresh
+        </button>
 
-      {/* User */}
-      <div className="mb-4">
-        <label className="font-semibold">Your name:</label>
-        <select
-          value={user}
-          onChange={e => setUser(e.target.value)}
-          className="w-full p-2 border mb-2"
-        >
-          {['Mohit','Bhaskar','Prerna','Others'].map(u => <option key={u}>{u}</option>)}
-        </select>
-        {user === 'Others' && (
-          <input
-            className="w-full p-2 border"
-            placeholder="Enter name"
-            value={customUser}
-            onChange={e => setCustomUser(e.target.value)}
-          />
-        )}
       </div>
+      
+      {/* User */}
+      
+      <div className="mb-6">
+        <label className="block font-semibold mb-2">User:</label>
+        <div className="flex flex-wrap gap-2">
+          {['Mohit', 'Bhaskar', 'Others'].map(name => (
+            <button
+              key={name}
+              onClick={() => setUser(name)}
+              className={`px-4 py-2 rounded border ${
+                user === name
+                  ? 'bg-blue-600 text-white border-blue-600'
+                  : 'bg-white text-gray-800 hover:bg-gray-100'
+              }`}
+            >
+              {name}
+            </button>
+          ))}
+        </div>
 
+      {user === 'Others' && (
+        <input
+          type="text"
+          placeholder="Your name"
+          value={customUser}
+          onChange={e => setCustomUser(e.target.value)}
+          className="mt-2 border p-2 rounded w-full"
+        />
+      )}
+      </div>
+          
+      
+        
       {/* Bank */}
       <div className="mb-4">
         <label className="font-semibold">Select Bank:</label>
-        <select
-          value={bank}
-          onChange={e => setBank(e.target.value)}
-          className="w-full p-2 border"
-        >
-          <option value="">-- pick --</option>
-          {bankList.map(b => <option key={b}>{b}</option>)}
-          <option>Others</option>
-        </select>
-        {bank === 'Others' && (
-          <input
-            className="w-full p-2 border mt-2"
-            placeholder="Custom Bank"
-            value={customBank}
-            onChange={e => setCustomBank(e.target.value)}
-          />
-        )}
+        <div className="flex flex-wrap gap-2">
+          {bankList.map(b => (
+            <button
+              key={b}
+              onClick={() => setBank(b)}
+              className={`px-4 py-2 rounded ${
+                bank === b ? 'bg-blue-600 text-white' : 'bg-gray-200'
+              }`}
+            >
+              {b}
+            </button>
+          ))}
+        </div>
       </div>
-
       {/* Segment */}
       <div className="mb-4">
-        <label className="font-semibold">Select Segment:</label>
-        <select
-          value={segment}
-          onChange={e => setSegment(e.target.value)}
-          className="w-full p-2 border"
+        <label className="block font-semibold mb-2">Select Segment:</label>
+
+      <div className="flex flex-wrap gap-2">
+        {filteredSegments.map(s => (
+          <button
+            key={s}
+            onClick={() => setSegment(s)}
+            className={`px-4 py-2 rounded ${
+              segment === s ? 'bg-blue-600 text-white' : 'bg-gray-200'
+            }`}
+          >
+            {s}
+          </button>
+        ))}
+
+      {/* “Others” option */}
+        <button
+          key="Others"
+          onClick={() => setSegment('Others')}
+          className={`px-4 py-2 rounded ${
+            segment === 'Others' ? 'bg-blue-600 text-white' : 'bg-gray-200'
+          }`}
         >
-          <option value="">-- pick --</option>
-          {filteredSegments.map(s => <option key={s}>{s}</option>)}
-          <option>Others</option>
-        </select>
-        {segment === 'Others' && (
-          <input
-            className="w-full p-2 border mt-2"
-            placeholder="Custom Segment"
-            value={customSegment}
-            onChange={e => setCustomSegment(e.target.value)}
-          />
-        )}
+          Others
+        </button>
       </div>
 
-      {/* Approved Queries */}
-      <div className="mb-4">
-        <label className="font-semibold">Pick an approved query:</label>
-        <select
-          value={selectedQuery}
-          onChange={e => setSelectedQuery(e.target.value)}
-          className="w-full p-2 border"
-        >
-          <option value="">-- none --</option>
-          {queries.map((q,i) => (
-            <option key={i} value={q.originalQuery}>{q.originalQuery}</option>
-          ))}
-        </select>
-      </div>
-
-      {/* Or custom SQL */}
-      <div className="mb-4">
-        <label className="font-semibold">Or paste your own SQL:</label>
-        <textarea
-          className="w-full p-2 border h-24"
-          value={customQuery}
-          onChange={e => setCustomQuery(e.target.value)}
+      {segment === 'Others' && (
+        <input
+          type="text"
+          placeholder="Custom Segment"
+          value={customSegment}
+          onChange={e => setCustomSegment(e.target.value)}
+          className="mt-2 w-full p-2 border rounded"
         />
+      )}
       </div>
 
-      {/* Prompt */}
-      <div className="mb-4">
-        <label className="font-semibold">Instruction / Prompt:</label>
-        <textarea
-          className="w-full p-2 border h-24"
-          value={prompt}
-          onChange={e => setPrompt(e.target.value)}
-          placeholder="E.g. only select id and name"
-        />
-      </div>
-
-      {/* Format only */}
-      <div className="mb-4">
-        <label className="flex items-center">
-          <input
-            type="checkbox"
-            checked={formatOnly}
-            onChange={e => setFormatOnly(e.target.checked)}
-            className="mr-2"
-          />
-          Only format (no changes)
-        </label>
-      </div>
-
-      {/* Generate */}
-      <button
-        onClick={handleGenerate}
-        disabled={loading}
-        className="bg-green-600 text-white px-4 py-2 rounded"
-      >
-        {loading ? 'Working…' : 'Generate Modified Query'}
-      </button>
-
+      
       {/* Edit result */}
       {modifiedQuery && (
         <div className="mt-6">
@@ -323,10 +399,46 @@ export default function SubmissionsPage() {
             >
               Send for Approval
             </button>
+            <button
+              onClick={handleComplianceCheck}
+              // onClick={() => handleComplianceCheck(item)}
+              disabled={complianceLoading}
+              className="bg-purple-600 text-white px-3 py-1 rounded"
+            >
+              {complianceLoading ? 'Checking…' : 'Compliance Check'}
+            </button>
           </div>
-        </div>
+        
+        {/* Debug: show raw LLM output */}
+        {/* {complianceResult && (
+          <pre className="mb-4 p-2 bg-gray-100 text-sm text-gray-800">
+            {complianceResult}
+          </pre>
+        )} */}
+        {/* Styled checklist */}
+          {checklist.length > 0 && (
+            <div className="mt-4 p-4 bg-gray-50 rounded">
+              <strong className="block mb-2">Compliance Feedback:</strong>
+              <div className="space-y-2">
+                {checklist.map(({ text }, i) => (
+                  <div key={i} className="flex items-center">
+                    <span className="text-blue-600 mr-2">•</span>
+                    <span className="text-gray-800">{text}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+
+
+
+      </div>
       )}
 
+      {/* Query selection */}
+
+      
       {/* Diff preview */}
       {finalDiff && (
         <div className="mt-6">
@@ -338,5 +450,5 @@ export default function SubmissionsPage() {
         </div>
       )}
     </div>
-  );
-}
+  )}
+  

@@ -2,6 +2,8 @@
 
 import React, { useEffect, useState } from 'react';
 import DiffMatchPatch from 'diff-match-patch';
+import { useRouter } from 'next/navigation';
+
 
 type Submission = {
   rowIndex: number;
@@ -19,18 +21,25 @@ type Submission = {
 type SegmentMapping = { bank: string; segment: string };
 
 export default function ReviewPage() {
+  const router = useRouter();
   const [submissions, setSubmissions] = useState<Submission[]>([]);
+  // const [searchTerm, setSearchTerm] = useState('');
+
   const [filtered, setFiltered] = useState<Submission[]>([]);
+  
+
   const [banks, setBanks] = useState<string[]>([]);
   const [segments, setSegments] = useState<string[]>([]);
   const [mapping, setMapping] = useState<SegmentMapping[]>([]);
-
+  const [complianceLoading, setComplianceLoading] = useState(false)
   const [bank, setBank] = useState('');
   const [segment, setSegment] = useState('');
-
-  const [reviewer, setReviewer] = useState('Mohit');
+  const [complianceResult, setComplianceResult]   = useState('')
+  const [reviewer, setReviewer] = useState('');
   const [customReviewer, setCustomReviewer] = useState('');
-
+  const [searchTerm, setSearchTerm] = useState('active = 1');
+  const [searchResultMap, setSearchResultMap] = useState<Record<number, boolean>>({});
+  
   // Fetch all submissions and derive bank/segment mapping from it
   useEffect(() => {
     fetch('/api/fetch-submissions')
@@ -82,7 +91,24 @@ export default function ReviewPage() {
       .replace(/\s+/g, ' ')              // collapse whitespace
       .trim();
   };
+  const handleComplianceCheck = async (item: Submission) => {
+    setComplianceLoading(true);
+    try {
+      const res = await fetch('/api/compliance-check', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ query: item.ModifiedQuery }),
+      });
 
+      const { result } = await res.json();
+      setComplianceResult(result);
+    } catch (e: any) {
+      setComplianceResult(`Error: ${e.message}`);
+    } finally {
+      setComplianceLoading(false);
+    }
+  };
+  
   const handleDecision = async (
     item: Submission,
     action: 'approve' | 'reject'
@@ -103,11 +129,21 @@ export default function ReviewPage() {
             rejectedBy: reviewerName,
           };
 
-    await fetch(url, {
+    const res = await fetch(url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body),
     });
+    if (res.ok) {
+    // REFRESH the page (re-runs your fetch-submissions useEffect)
+      window.location.reload();
+      // alert(action === 'approve'
+      //   ? `Approved (minified) by ${reviewerName}`
+      //   : `Rejected by ${reviewerName}`);
+    } else {
+      const { error } = await res.json();
+      alert('Error: ' + error);
+    }
 
     // Remove item from UI
     setSubmissions(s => s.filter(r => r.rowIndex !== item.rowIndex));
@@ -119,7 +155,14 @@ export default function ReviewPage() {
         : `Rejected by ${reviewerName}`
     );
   };
-
+  const handleSearch = () => {
+    const map: Record<number, boolean> = {};
+    filtered.forEach(item => {
+      map[item.rowIndex] = item.ModifiedQuery.toLowerCase().includes(searchTerm.toLowerCase());
+    });
+    setSearchResultMap(map);
+  };
+  
   const highlightDiff = (orig: string, mod: string) => {
     if (!orig || !mod) return '<i>Missing query</i>';
     const dmp = new DiffMatchPatch();
@@ -146,7 +189,18 @@ export default function ReviewPage() {
       .join('')
       .trim();
   };
-
+  const checklist = (complianceResult || '')
+    .split('\n')
+    .filter(line => /^[-•*]\s+/.test(line.trim()))
+    .map(line => ({
+      text: line.replace(/^[-•*]\s+/, '').trim()
+    }));
+  const highlightSearchTerm = (text: string) => {
+    if (!searchTerm.trim()) return text;
+    const regex = new RegExp(`(${searchTerm})`, 'gi');
+    return text.replace(regex, '<mark style="background-color: #fde047;">$1</mark>');
+  };
+    
   return (
     <div className="p-6 mx-auto max-w-5xl">
       <h1 className="text-2xl font-bold mb-6">Review Submissions</h1>
@@ -156,19 +210,33 @@ export default function ReviewPage() {
       >
         ← Go to Home
       </a>
+      <div className="flex justify-end">
+        <button
+        onClick = {() => window.location.reload()}
+        className ="bg-gray-200 hover:bg-gray-300 text-gray-800 px-3 py-1 rounded"
+        > 
+        🔄 Refresh
+        </button>
+
+      </div>
+      
 
       {/* Reviewer */}
       <div className="mb-6">
         <label className="block font-semibold mb-2">Reviewer:</label>
-        <select
-          value={reviewer}
-          onChange={e => setReviewer(e.target.value)}
-          className="border p-2 rounded w-full"
-        >
-          {['Mohit', 'Bhaskar', 'Prerna', 'Others'].map(name => (
-            <option key={name}>{name}</option>
+        <div className="flex flex-wrap gap-2">
+          {['Mohit', 'Bhaskar', 'Others'].map(name => (
+            <button
+              key={name}
+              onClick={() => setReviewer(name)}
+              className={`px-4 py-2 rounded border ${
+                reviewer === name ? 'bg-blue-600 text-white' : 'bg-gray-200'
+              }`}
+            >
+              {name}
+            </button>
           ))}
-        </select>
+        </div>
         {reviewer === 'Others' && (
           <input
             type="text"
@@ -217,6 +285,31 @@ export default function ReviewPage() {
           </div>
         </div>
       )}
+      
+
+      <div className="mt-4 mb-6">
+        <div className="flex gap-2">
+          <input
+            type="text"
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            placeholder="Search in Modified Query (e.g. active = 1)"
+            className="border p-2 rounded w-full"
+          />
+          <button
+            className="bg-blue-600 text-white px-3 py-1 rounded"
+            onClick={() => {
+              const results: Record<number, boolean> = {};
+              filtered.forEach(item => {
+                results[item.rowIndex] = item.ModifiedQuery.toLowerCase().includes(searchTerm.toLowerCase());
+              });
+              setSearchResultMap(results);
+            }}
+          >
+            Search
+          </button>
+        </div>
+      </div>
 
       {/* Submissions List */}
       {filtered.map(item => (
@@ -239,22 +332,43 @@ export default function ReviewPage() {
           <p className="mt-2">
             <strong>Modified Query:</strong>
           </p>
-          <pre className="bg-gray-50 p-2 rounded text-sm overflow-auto">
-            {item.ModifiedQuery}
-          </pre>
+          <pre
+            className="bg-gray-50 p-2 rounded text-sm whitespace-pre-wrap break-words"
+            style={{ overflowX: 'auto', whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}
+            dangerouslySetInnerHTML={{
+              __html: highlightSearchTerm(item.ModifiedQuery),
+            }}
+          />
+
+
           <p className="mt-4">
             <strong>Changes:</strong>
           </p>
-          <div
-            className="bg-gray-100 p-2 rounded whitespace-pre-wrap break-words"
-            dangerouslySetInnerHTML={{
-              __html: highlightDiff(
-                item.OriginalQuery,
-                item.ModifiedQuery
-              ),
-            }}
-          />
+          <div className="bg-gray-100 p-2 rounded whitespace-pre-wrap break-words">
+            <div
+              dangerouslySetInnerHTML={{
+                __html: highlightDiff(item.OriginalQuery, item.ModifiedQuery),
+              }}
+            />
+            {searchResultMap[item.rowIndex] !== undefined && (
+              <div className="mt-2">
+                <span className={`font-semibold ${searchResultMap[item.rowIndex] ? 'text-green-600' : 'text-red-600'}`}>
+                  {searchResultMap[item.rowIndex] ? '✅ Yes (match found)' : '❌ No (not found)'}
+                </span>
+              </div>
+            )}
+          </div>
+
           <div className="mt-4 flex gap-2">
+            
+            <button
+              onClick={() => handleComplianceCheck(item)}
+              disabled={complianceLoading}
+              className="bg-purple-600 text-white px-3 py-1 rounded"
+            >
+              {complianceLoading ? 'Checking…' : 'Compliance Check'}
+            </button>
+            
             <button
               onClick={() => handleDecision(item, 'approve')}
               className="bg-green-600 text-white px-4 py-2 rounded"
@@ -270,6 +384,28 @@ export default function ReviewPage() {
           </div>
         </div>
       ))}
+      {/* Debug: show raw LLM output */}
+      {/* {complianceResult && (
+        <pre className="mb-4 p-2 bg-gray-100 text-sm text-gray-800">
+          {complianceResult}
+        </pre>
+      )} */}
+      {/* Styled checklist */}
+      {checklist.length > 0 && (
+        <div className="mt-4 p-4 bg-gray-50 rounded">
+          <strong className="block mb-2">Compliance Feedback:</strong>
+          <div className="space-y-2">
+            {checklist.map(({ text }, i) => (
+              <div key={i} className="flex items-center">
+                <span className="text-blue-600 mr-2">•</span>
+                <span className="text-gray-800">{text}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+
 
       {/* Empty state */}
       {bank && segment && filtered.length === 0 && (

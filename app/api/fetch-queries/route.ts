@@ -5,6 +5,7 @@ import { Buffer } from 'buffer';
 function loadServiceAccount() {
   const b64 = process.env.GOOGLE_SERVICE_KEY_JSON_B64!;
   const json = Buffer.from(b64, 'base64').toString('utf8');
+  console.log('🔍 Decoded JSON snippet:', json.slice(0, 100));
   return JSON.parse(json) as { client_email: string; private_key: string; [k: string]: any };
 }
 

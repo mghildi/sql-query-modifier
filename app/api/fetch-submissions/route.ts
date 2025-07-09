@@ -26,15 +26,15 @@ export async function GET() {
 
   const submissions = rows.map((r, i) => ({
     rowIndex:      i + 2,
-    OriginalQuery: r[0] || '',
-    Prompt:        r[1] || '',
-    ModifiedQuery: r[2] || '',
-    Status:        r[3] || '',
-    SubmittedBy:   r[4] || '',
-    ApprovedBy:    r[5] || '',
-    Timestamp:     r[6] || '',
-    BankName:      r[7] || '',
-    Segment:       r[8] || '',
+    OriginalQuery: r[3] || '',
+  
+    ModifiedQuery: r[4] || '',
+    Status:        r[5] || '',
+    SubmittedBy:   r[6] || '',
+    ApprovedBy:    r[7] || '',
+    Timestamp:     r[0] || '',
+    BankName:      r[1] || '',
+    Segment:       r[2] || '',
     // column-9 might be anything else…
   }));
 

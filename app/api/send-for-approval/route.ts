@@ -3,6 +3,12 @@
 import { google } from 'googleapis';
 import { NextResponse } from 'next/server';
 import { Buffer } from 'buffer';
+import { format } from 'date-fns-tz';
+
+const istTimestamp = format(new Date(), "yyyy-MM-dd'T'HH:mm:ss", {
+  timeZone: 'Asia/Kolkata'
+});
+
 
 // === Shared helper to decode Base64 JSON creds ===
 function loadServiceAccount() {
@@ -14,7 +20,6 @@ function loadServiceAccount() {
   return svc;
 }
 
-
 export async function POST(req: Request) {
   try {
     const {
@@ -24,21 +29,15 @@ export async function POST(req: Request) {
       submittedBy,
       bank,
       segment,
-      sheet1RowIndex
+      sheet1RowIndex   // zero-based index of the data row in Sheet1
     } = await req.json();
-    console.log('Payload received:', {
-      originalQuery,
-      prompt,
-      modifiedQuery,
-      submittedBy,
-      bank,
-      segment,
-      sheet1RowIndex
-    });
 
+    // const HEADER_ROWS   = 1;  // number of header rows in Sheet1
+    // const sheet1RowNum  = sheet1RowIndex + HEADER_ROWS + 1; // real spreadsheet row
+    const sheet1RowNum = sheet1RowIndex;
     const spreadsheetId = '1GwTyj7g0pbqyvwBiWbUXHi_J1qboJ2rryXgCXtpnvLM';
 
-    // === Authenticate with Google using Base64 creds ===
+    // === Authenticate ===
     const svc  = loadServiceAccount();
     const auth = new google.auth.GoogleAuth({
       credentials: svc,
@@ -46,56 +45,51 @@ export async function POST(req: Request) {
     });
     const sheets = google.sheets({ version: 'v4', auth });
 
-    // Build the new submission row
+    // 1) Append into Submissions
     const values = [[
-      originalQuery,
-      prompt,
-      modifiedQuery,
-      'Pending',         // Status
-      submittedBy,       // SubmittedBy
-      '',                // ApprovedBy (blank until review)
-      new Date().toISOString(),
+      istTimestamp,
       bank,
       segment,
+      originalQuery,
+    
+      modifiedQuery,
+      'Pending',       // Status
+      submittedBy,     // SubmittedBy
+      '',              // ApprovedBy
+      
+      
     ]];
-
-    // Append into Submissions!A2:I
     await sheets.spreadsheets.values.append({
       spreadsheetId,
-      range: 'Submissions!A:I',
+      range: 'Submissions!A2:I',        // lock in the header row
       valueInputOption: 'USER_ENTERED',
       requestBody: { values },
     });
-    
 
-    console.log('Received row index:', sheet1RowIndex);
-    if (sheet1RowIndex !== null && sheet1RowIndex !== undefined) {
-      console.log('Attempting to delete from Sheet1 at row:', sheet1RowIndex);
-    }
-
-    if (sheet1RowIndex !== null && sheet1RowIndex !== undefined) {
-      const sheetMeta = await sheets.spreadsheets.get({ spreadsheetId });
-      const sheet1Id = sheetMeta.data.sheets!
+    // 2) Delete that row from Sheet1
+    if (sheet1RowIndex != null) {
+      const meta = await sheets.spreadsheets.get({ spreadsheetId });
+      const sheet1Id = meta.data.sheets!
         .find(s => s.properties?.title === 'Sheet1')!
         .properties!.sheetId!;
-      console.log('Row Index to delete:', sheet1RowIndex);
-      console.log('Sheet1 ID:', sheet1Id);
+
       await sheets.spreadsheets.batchUpdate({
         spreadsheetId,
         requestBody: {
           requests: [{
             deleteDimension: {
               range: {
-                sheetId: sheet1Id,
+                sheetId:   sheet1Id,
                 dimension: 'ROWS',
-                startIndex: sheet1RowIndex - 1, // zero-based
-                endIndex: sheet1RowIndex       // exclusive
+                startIndex: sheet1RowNum - 1,  // zero-based inclusive
+                endIndex:   sheet1RowNum        // exclusive
               }
             }
           }]
         }
       });
     }
+
     return NextResponse.json({ status: 'submitted' });
   } catch (err: any) {
     console.error('Error in send-for-approval API:', err);

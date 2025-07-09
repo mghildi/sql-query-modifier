@@ -3,6 +3,11 @@
 import { google } from 'googleapis';
 import { NextResponse } from 'next/server';
 import { Buffer } from 'buffer';
+import { format } from 'date-fns-tz';
+
+const istTimestamp = format(new Date(), "yyyy-MM-dd'T'HH:mm:ss", {
+  timeZone: 'Asia/Kolkata'
+});
 
 // === Shared helper to decode Base64 JSON creds ===
 function loadServiceAccount() {
@@ -53,7 +58,7 @@ export async function POST(req: Request) {
       'Rejected',       // Status
       row[4] || '',     // SubmittedBy
       rejectedBy,       // RejectedBy
-      new Date().toISOString(), // Timestamp
+      istTimestamp, // Timestamp
       row[7] || '',     // BankName
       row[8] || ''      // Segment
     ];
