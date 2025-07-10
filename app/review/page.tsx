@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
+import Link from 'next/link';
 import DiffMatchPatch from 'diff-match-patch';
 import { useRouter } from 'next/navigation';
 
@@ -27,7 +28,7 @@ export default function ReviewPage() {
 
   const [filtered, setFiltered] = useState<Submission[]>([]);
   
-
+  const [refreshLoading, setRefreshLoading] = useState(false);
   const [banks, setBanks] = useState<string[]>([]);
   const [segments, setSegments] = useState<string[]>([]);
   const [mapping, setMapping] = useState<SegmentMapping[]>([]);
@@ -202,24 +203,43 @@ export default function ReviewPage() {
   };
     
   return (
-    <div className="p-6 mx-auto max-w-5xl">
-      <h1 className="text-2xl font-bold mb-6">Review Submissions</h1>
-      <a
-        href="/"
-        className="inline-block mb-4 text-blue-600 underline hover:text-blue-800"
-      >
-        ← Go to Home
-      </a>
-      <div className="flex justify-end">
-        <button
-        onClick = {() => window.location.reload()}
-        className ="bg-gray-200 hover:bg-gray-300 text-gray-800 px-3 py-1 rounded"
-        > 
-        🔄 Refresh
-        </button>
-
-      </div>
+    <div className="relative min-h-screen bg-black text-white"> 
+      {/* HEADER */}
+      <div className="flex items-center justify-between px-6 py-4">
       
+
+        {/* Title on the left */}
+        <h1 className="text-2xl font-bold">Review Submissions</h1>
+
+        {/* Home + Refresh on the right */}
+        <div className="flex items-center space-x-4">
+        <Link
+          href="/"
+          className="inline-flex items-center text-blue-400 hover:text-blue-200"
+        >
+          Home
+        </Link>
+
+          <button
+            onClick={() => {
+              setRefreshLoading(true);
+              window.location.reload();
+            }}
+            disabled={refreshLoading}
+            className={`
+              inline-flex items-center
+              px-3 py-1 rounded
+              bg-gray-200 hover:bg-gray-300
+              text-gray-800
+              transition-opacity duration-150
+              ${refreshLoading ? 'opacity-50 cursor-not-allowed' : ''}
+            `}
+          >
+            {refreshLoading ? 'Refreshing…' : '🔄 Refresh'}
+          </button>
+        </div>
+      
+        </div>
 
       {/* Reviewer */}
       <div className="mb-6">
@@ -230,7 +250,7 @@ export default function ReviewPage() {
               key={name}
               onClick={() => setReviewer(name)}
               className={`px-4 py-2 rounded border ${
-                reviewer === name ? 'bg-blue-600 text-white' : 'bg-gray-200'
+                reviewer === name ? 'bg-blue-600 text-white' : 'bg-gray-200 text-gray-800 hover:bg-gray-300'
               }`}
             >
               {name}
@@ -257,7 +277,7 @@ export default function ReviewPage() {
               key={b}
               onClick={() => setBank(b)}
               className={`px-4 py-2 rounded ${
-                bank === b ? 'bg-blue-600 text-white' : 'bg-gray-200'
+                bank === b ? 'bg-blue-600 text-white' : 'bg-gray-200 text-gray-800 hover:bg-gray-300'
               }`}
             >
               {b}
@@ -276,7 +296,7 @@ export default function ReviewPage() {
                 key={s}
                 onClick={() => setSegment(s)}
                 className={`px-4 py-2 rounded ${
-                  segment === s ? 'bg-green-600 text-white' : 'bg-gray-200'
+                  segment === s ? 'bg-green-600 text-white' : 'bg-gray-200 text-gray-800 hover:bg-gray-300'
                 }`}
               >
                 {s}
@@ -315,7 +335,7 @@ export default function ReviewPage() {
       {filtered.map(item => (
         <div
           key={item.rowIndex}
-          className="border rounded p-4 mb-4 bg-white"
+          className="border rounded p-4 mb-4 bg-black"
         >
           <p>
             <strong>Submitted By:</strong> {item.SubmittedBy}
@@ -326,14 +346,14 @@ export default function ReviewPage() {
           <p className="mt-4">
             <strong>Original Query:</strong>
           </p>
-          <pre className="bg-gray-50 p-2 rounded text-sm overflow-auto">
+          <pre className="bg-blue-800 p-2 rounded text-sm overflow-auto">
             {item.OriginalQuery}
           </pre>
           <p className="mt-2">
             <strong>Modified Query:</strong>
           </p>
           <pre
-            className="bg-gray-50 p-2 rounded text-sm whitespace-pre-wrap break-words"
+            className="bg-black-50 p-2 rounded text-sm whitespace-pre-wrap break-words"
             style={{ overflowX: 'auto', whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}
             dangerouslySetInnerHTML={{
               __html: highlightSearchTerm(item.ModifiedQuery),
@@ -344,7 +364,7 @@ export default function ReviewPage() {
           <p className="mt-4">
             <strong>Changes:</strong>
           </p>
-          <div className="bg-gray-100 p-2 rounded whitespace-pre-wrap break-words">
+          <div className="bg-black-600 p-2 rounded whitespace-pre-wrap break-words">
             <div
               dangerouslySetInnerHTML={{
                 __html: highlightDiff(item.OriginalQuery, item.ModifiedQuery),
@@ -415,5 +435,6 @@ export default function ReviewPage() {
         </p>
       )}
     </div>
+  
   );
 }

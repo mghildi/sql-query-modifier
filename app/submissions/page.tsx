@@ -29,6 +29,8 @@ export default function SubmissionsPage() {
   const editRef = useRef<HTMLTextAreaElement>(null);
   const [complianceLoading, setComplianceLoading] = useState(false)
   const [complianceResult, setComplianceResult]   = useState('')
+  const [refreshLoading, setRefreshLoading] = useState(false);
+
 
   useEffect(() => {
     fetch('/api/fetch-bank-segment')
@@ -261,28 +263,69 @@ export default function SubmissionsPage() {
 
 
   return (
-    <div className="p-6 max-w-3xl mx-auto">
-      <div className="flex justify-between items-center mb-6">
-        <h1 className="text-xl font-bold">SQL Query Modifier</h1>
-        <Link href="/review">
-          <button className="bg-blue-600 text-white px-3 py-1 rounded">Go to Review</button>
-        </Link>
-      </div>
-      <a
-        href="/"
-        className="inline-block mb-4 text-blue-600 underline hover:text-blue-800"
-      >
-        ← Go to Home
-      </a>
-      <div className="flex justify-end">
-        <button
-        onClick = {() => window.location.reload()}
-        className ="bg-gray-200 hover:bg-gray-300 text-gray-800 px-3 py-1 rounded"
-        > 
-        🔄 Refresh
-        </button>
+    // <div className="relative min-h-screen bg-black text-white">
+    <div className="relative min-h-screen bg-black text-white">
+      {/* {(refreshLoading || loading || complianceLoading) && (
+        <div className="absolute inset-0 bg-white bg-opacity-10 backdrop-blur-sm flex items-center justify-center z-50">
+          <div className="h-12 w-12 border-4 border-white border-t-transparent rounded-full animate-spin" />
+        </div>
+      )} */}
 
-      </div>
+
+
+    {/* <div className="p-6 max-w-3xl mx-auto"> */}
+      <header className="flex items-center px-6 py-4 bg-black">
+        {/* Page title */}
+        <h1 className="text-xl font-bold text-white">SQL Query Modifier</h1>
+
+        {/* Left‐side nav: Home + Refresh */}
+        <nav className="flex space-x-6 ml-6 text-white font-medium">
+          {/* Home link */}
+          <Link
+            href="/"
+            className="ml-auto inline-flex items-center px-5 py-2 bg-gradient-to-r from-blue-400 to-purple-500 text-white text-base font-semibold rounded-full shadow-lg hover:opacity-90 transition"
+          >
+            Home
+          </Link>
+
+          {/* <Link href="/" className="hover:underline">
+            Home
+          </Link> */}
+
+          {/* Refresh button */}
+          <button
+            onClick={() => {
+              setRefreshLoading(true);
+              window.location.reload();
+            }}
+            disabled={refreshLoading}
+            className={`
+        className="ml-auto inline-flex items-center px-5 py-2 bg-gradient-to-r from-blue-400 to-purple-500 text-white text-base font-semibold rounded-full shadow-lg hover:opacity-90 transition"
+        ${refreshLoading ? 'opacity-50 cursor-not-allowed' : ''}
+      `}
+          >
+            {refreshLoading ? 'Refreshing…' : '🔄 Refresh'}
+          </button>
+        </nav>
+
+        {/* CTA pill pushed to far right */}
+        <Link
+          href="/review"
+          className="
+      ml-auto inline-flex items-center
+      px-5 py-2
+      bg-gradient-to-r from-blue-400 to-purple-500
+      text-white text-base font-semibold
+      rounded-full shadow-lg
+      hover:opacity-90 transition
+    "
+        >
+          Go to Review&nbsp;<span className="text-xl">➔</span>
+        </Link>
+      </header>
+
+      
+
       
       {/* User */}
       
@@ -295,8 +338,9 @@ export default function SubmissionsPage() {
               onClick={() => setUser(name)}
               className={`px-4 py-2 rounded border ${
                 user === name
-                  ? 'bg-blue-600 text-white border-blue-600'
-                  : 'bg-white text-gray-800 hover:bg-gray-100'
+                ? 'bg-gradient-to-r from-blue-500 to-purple-500 text-white px-6 py-3 rounded-lg hover:opacity-90'
+                  
+                  :'bg-white text-gray-800 hover:bg-gray-100'
               }`}
             >
               {name}
@@ -326,7 +370,7 @@ export default function SubmissionsPage() {
               key={b}
               onClick={() => setBank(b)}
               className={`px-4 py-2 rounded ${
-                bank === b ? 'bg-blue-600 text-white' : 'bg-gray-200'
+                bank === b ? 'bg-gradient-to-r from-blue-500 to-purple-500 text-white px-6 py-3 rounded-lg hover:opacity-90' :'bg-white text-gray-800 hover:bg-gray-100'
               }`}
             >
               {b}
@@ -344,19 +388,20 @@ export default function SubmissionsPage() {
             key={s}
             onClick={() => setSegment(s)}
             className={`px-4 py-2 rounded ${
-              segment === s ? 'bg-blue-600 text-white' : 'bg-gray-200'
+              
+              segment === s ? 'bg-gradient-to-r from-blue-500 to-purple-500 text-white px-6 py-3 rounded-lg hover:opacity-90' : 'bg-white text-gray-800 hover:bg-gray-100'
             }`}
           >
             {s}
           </button>
         ))}
-
+          
       {/* “Others” option */}
         <button
           key="Others"
           onClick={() => setSegment('Others')}
           className={`px-4 py-2 rounded ${
-            segment === 'Others' ? 'bg-blue-600 text-white' : 'bg-gray-200'
+            segment === 'Others' ? 'bg-gradient-to-r from-blue-500 to-purple-500 text-white px-6 py-3 rounded-lg hover:opacity-90' :'bg-white text-gray-800 hover:bg-gray-100'
           }`}
         >
           Others
@@ -395,7 +440,7 @@ export default function SubmissionsPage() {
             </button>
             <button
               onClick={handleSubmit}
-              className="bg-yellow-500 text-white px-3 py-1 rounded"
+              className="bg-gradient-to-r from-blue-500 to-purple-500 text-white px-6 py-3 rounded-lg hover:opacity-90"
             >
               Send for Approval
             </button>
@@ -418,7 +463,7 @@ export default function SubmissionsPage() {
         {/* Styled checklist */}
           {checklist.length > 0 && (
             <div className="mt-4 p-4 bg-gray-50 rounded">
-              <strong className="block mb-2">Compliance Feedback:</strong>
+              <strong className="block mb-2 text-black">Compliance Feedback:</strong>
               <div className="space-y-2">
                 {checklist.map(({ text }, i) => (
                   <div key={i} className="flex items-center">
@@ -444,10 +489,11 @@ export default function SubmissionsPage() {
         <div className="mt-6">
           <h2 className="font-semibold">Final Diff</h2>
           <div
-            className="bg-gray-100 p-4 rounded whitespace-pre-wrap break-words"
+            className="bg-blue-800 p-4 rounded whitespace-pre-wrap break-words"
+            
             dangerouslySetInnerHTML={{ __html: finalDiff }}
           />
-        </div>
+        </div>  
       )}
     </div>
   )}
