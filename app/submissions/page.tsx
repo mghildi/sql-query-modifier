@@ -133,6 +133,7 @@ export default function SubmissionsPage() {
     setFinalDiff('');
     const orig = baseQuery();
     if (formatOnly) {
+      
       const f = orig
         .replace(/\s+/g, ' ')
         .replace(/\s*([(),=<>])\s*/g, '$1')
@@ -184,7 +185,8 @@ export default function SubmissionsPage() {
     const modNorm  = minifySQL(editableQuery);
         // Step 1: turn SQL into tokens
     const tokenize = (sql: string) =>
-      (sql.match(/\w+|[^\s\w]+/g) || [])
+      
+      (sql.match(/\w+(?:\.\w+)*|[^\s\w]+/g) || [])
         .map(t => t.trim().toLowerCase())
         .filter(Boolean);
 
@@ -220,8 +222,9 @@ export default function SubmissionsPage() {
     setFinalDiff(html);
   };
   const minifySQL = (sql: string): string =>
+    
     sql
-    .replace(/--.*$/gm, '')            // remove single-line comments
+    .replace(/--.*$/gm, ' ')            // remove single-line comments
     .replace(/\/\*[\s\S]*?\*\//g, ' ')  // remove block comments
     .replace(/\s{2,}/g, ' ')              // collapse all whitespace
     .trim();
