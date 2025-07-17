@@ -85,13 +85,25 @@ export default function ReviewPage() {
     reviewer === 'Others' ? customReviewer.trim() || 'Unknown' : reviewer;
 
   // Helper to strip comments + collapse whitespace
+  // const minifySQL = (sql: string): string => {
+  //   return sql
+  //     .replace(/--.*$/gm, '')            // remove single-line comments
+  //     .replace(/\/\*[\s\S]*?\*\//g, '')  // remove block comments
+  //     .replace(/\s+/g, ' ')              // collapse whitespace
+  //     .trim();
+  // };
   const minifySQL = (sql: string): string => {
     return sql
-      .replace(/--.*$/gm, '')            // remove single-line comments
-      .replace(/\/\*[\s\S]*?\*\//g, '')  // remove block comments
-      .replace(/\s+/g, ' ')              // collapse whitespace
+      // replace single-line comments with one space
+      .replace(/--.*$/gm, ' ')
+      // replace /*…*/ comments with one space
+      .replace(/\/\*[\s\S]*?\*\//g, ' ')
+      // collapse any run of whitespace (spaces, tabs, newlines) to exactly one space
+      .replace(/\s+/g, ' ')
+      // drop leading/trailing space
       .trim();
   };
+  
   const handleComplianceCheck = async (item: Submission) => {
     setComplianceLoading(true);
     try {
@@ -168,7 +180,8 @@ export default function ReviewPage() {
     if (!orig || !mod) return '<i>Missing query</i>';
     const dmp = new DiffMatchPatch();
     const tokenize = (sql: string) =>
-      (sql.match(/\w+|[^\s\w]+/g) || [])
+      
+      (sql.match(/\w+(?:\.\w+)*|[^\s\w]+/g) || [])
         .map(t => t.trim())
         .filter(Boolean);
     const origTokens = tokenize(orig);
@@ -180,7 +193,7 @@ export default function ReviewPage() {
     dmp.diff_cleanupSemantic(diffs);
     return diffs
       .map(([op, txt]: [number, string]) => {
-        const token = txt.replace(/\n/g, '');
+        const token = txt.replace(/\n/g, ' ');
         if (op === DiffMatchPatch.DIFF_INSERT)
           return `<b style="color:red;">${token}</b> `;
         if (op === DiffMatchPatch.DIFF_DELETE)

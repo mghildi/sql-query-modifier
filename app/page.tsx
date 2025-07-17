@@ -31,6 +31,12 @@ export default function HomePage() {
         height={328}
         className="rounded-lg shadow-lg"
       />
+
+      
     </div>
+    
+
+
+   
   )
 }
